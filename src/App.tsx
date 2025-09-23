@@ -1,0 +1,46 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { AuthProvider } from "./components/AuthProvider";
+import Layout from "./components/Layout";
+import Dashboard from "./pages/Dashboard";
+import Auth from "./pages/Auth";
+import AddMachine from "./pages/AddMachine";
+import Machines from "./pages/Machines";
+import AllMachines from "./pages/AllMachines";
+import MachineReport from "./pages/MachineReport";
+import PayToClowee from "./pages/PayToClowee";
+import Invoices from "./pages/Invoices";
+import NotFound from "./pages/NotFound";
+
+const queryClient = new QueryClient();
+
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <TooltipProvider>
+      <Toaster />
+      <Sonner />
+      <AuthProvider>
+        <BrowserRouter>
+          <Routes>
+            <Route path="/auth" element={<Auth />} />
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="add-machine" element={<AddMachine />} />
+              <Route path="machines" element={<Machines />} />
+              <Route path="all-machines" element={<AllMachines />} />
+              <Route path="machine-report" element={<MachineReport />} />
+              <Route path="pay-to-clowee" element={<PayToClowee />} />
+              <Route path="invoices" element={<Invoices />} />
+            </Route>
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </AuthProvider>
+    </TooltipProvider>
+  </QueryClientProvider>
+);
+
+export default App;
