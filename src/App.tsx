@@ -10,6 +10,7 @@ import Auth from "./pages/Auth";
 import AddMachine from "./pages/AddMachine";
 import Machines from "./pages/Machines";
 import AllMachines from "./pages/AllMachines";
+import AllReports from "./pages/AllReports";
 import MachineReport from "./pages/MachineReport";
 import PayToClowee from "./pages/PayToClowee";
 import Invoices from "./pages/Invoices";
@@ -31,6 +32,7 @@ const App = () => (
               <Route path="add-machine" element={<AddMachine />} />
               <Route path="machines" element={<Machines />} />
               <Route path="all-machines" element={<AllMachines />} />
+              <Route path="all-reports" element={<AllReports />} />
               <Route path="machine-report" element={<MachineReport />} />
               <Route path="pay-to-clowee" element={<PayToClowee />} />
               <Route path="invoices" element={<Invoices />} />

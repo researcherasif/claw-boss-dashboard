@@ -38,7 +38,12 @@ const Layout = () => {
       href: "/all-machines",
     },
     {
-      title: "Machine Report",
+      title: "All Bills",
+      icon: FileText,
+      href: "/all-reports",
+    },
+    {
+      title: "Coin & Prize Count",
       icon: FileText,
       href: "/machine-report",
     },

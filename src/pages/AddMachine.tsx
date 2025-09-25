@@ -21,22 +21,53 @@ const AddMachine = () => {
     try {
       const formData = new FormData(e.target as HTMLFormElement);
       
-      const machineData = {
+      const ownerShare = parseFloat(formData.get('owner_profit_share_percentage') as string);
+      const cloweeShare = parseFloat(formData.get('clowee_profit_share_percentage') as string);
+
+      if (!Number.isFinite(ownerShare) || !Number.isFinite(cloweeShare)) {
+        throw new Error('Please provide valid profit share percentages');
+      }
+
+      if (ownerShare + cloweeShare > 100.0) {
+        throw new Error('Owner + Clowee profit share cannot exceed 100%');
+      }
+
+      // Detect if new share columns exist
+      let supportsSplitShares = true;
+      try {
+        const test = await supabase
+          .from('machines')
+          .select('owner_profit_share_percentage, clowee_profit_share_percentage')
+          .limit(1);
+        if (test.error) supportsSplitShares = false;
+      } catch {
+        supportsSplitShares = false;
+      }
+
+      const baseData = {
         name: formData.get('name') as string,
         coin_price: parseFloat(formData.get('coin_price') as string),
         doll_price: parseFloat(formData.get('doll_price') as string),
         electricity_cost: parseFloat(formData.get('electricity_cost') as string),
         vat_percentage: parseFloat(formData.get('vat_percentage') as string),
-        profit_share_percentage: parseFloat(formData.get('profit_share_percentage') as string),
         maintenance_percentage: parseFloat(formData.get('maintenance_percentage') as string),
         duration: formData.get('duration') as string,
         location: formData.get('location') as string,
         installation_date: formData.get('installation_date') as string,
-      };
+      } as any;
 
-      const { error } = await supabase
-        .from('machines')
-        .insert([machineData]);
+      const machineData = supportsSplitShares
+        ? {
+            ...baseData,
+            owner_profit_share_percentage: ownerShare,
+            clowee_profit_share_percentage: cloweeShare,
+          }
+        : {
+            ...baseData,
+            profit_share_percentage: cloweeShare,
+          };
+
+      const { error } = await supabase.from('machines').insert([machineData]);
 
       if (error) throw error;
 
@@ -152,10 +183,24 @@ const AddMachine = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="profit_share_percentage">Profit Share Percentage (%)</Label>
+                <Label htmlFor="owner_profit_share_percentage">Restaurant Owner Profit Share (%)</Label>
                 <Input
-                  id="profit_share_percentage"
-                  name="profit_share_percentage"
+                  id="owner_profit_share_percentage"
+                  name="owner_profit_share_percentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="clowee_profit_share_percentage">Clowee Profit Share (%)</Label>
+                <Input
+                  id="clowee_profit_share_percentage"
+                  name="clowee_profit_share_percentage"
                   type="number"
                   step="0.01"
                   min="0"

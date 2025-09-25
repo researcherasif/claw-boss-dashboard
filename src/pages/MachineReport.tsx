@@ -8,16 +8,24 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { formatCurrencyBDT } from '@/lib/currency';
 
 interface Machine {
   id: string;
   name: string;
   location: string;
+  coin_price?: number;
+  doll_price?: number;
 }
 
 const MachineReport = () => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachine, setSelectedMachine] = useState('');
+  const [selectedDate, setSelectedDate] = useState('');
+  const [todayCoinCount, setTodayCoinCount] = useState<number | ''>('');
+  const [todayPrizeCount, setTodayPrizeCount] = useState<number | ''>('');
+  const [prevCoinCount, setPrevCoinCount] = useState<number | null>(null);
+  const [prevPrizeCount, setPrevPrizeCount] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
   const [fetchingMachines, setFetchingMachines] = useState(true);
   const { user } = useAuth();
@@ -31,7 +39,7 @@ const MachineReport = () => {
     try {
       const { data, error } = await supabase
         .from('machines')
-        .select('id, name, location')
+        .select('id, name, location, coin_price, doll_price')
         .eq('is_active', true)
         .order('name');
 
@@ -45,6 +53,26 @@ const MachineReport = () => {
       });
     } finally {
       setFetchingMachines(false);
+    }
+  };
+
+  const fetchPreviousReport = async (machineId: string, beforeDate: string) => {
+    try {
+      if (!machineId || !beforeDate) return;
+      const { data, error } = await supabase
+        .from('machine_reports')
+        .select('coin_count, prize_count, report_date')
+        .eq('machine_id', machineId)
+        .lt('report_date', beforeDate)
+        .order('report_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) return;
+      setPrevCoinCount(data?.coin_count ?? null);
+      setPrevPrizeCount(data?.prize_count ?? null);
+    } catch {
+      setPrevCoinCount(null);
+      setPrevPrizeCount(null);
     }
   };
 
@@ -108,6 +136,11 @@ const MachineReport = () => {
       // Reset form
       (e.target as HTMLFormElement).reset();
       setSelectedMachine('');
+      setSelectedDate('');
+      setTodayCoinCount('');
+      setTodayPrizeCount('');
+      setPrevCoinCount(null);
+      setPrevPrizeCount(null);
     } catch (error: any) {
       toast({
         title: "Error submitting report",
@@ -120,6 +153,19 @@ const MachineReport = () => {
   };
 
   const today = new Date().toISOString().split('T')[0];
+  useEffect(() => {
+    // Default selected date to today on mount
+    setSelectedDate(today);
+  }, []);
+
+  useEffect(() => {
+    if (selectedMachine && selectedDate) {
+      fetchPreviousReport(selectedMachine, selectedDate);
+    } else {
+      setPrevCoinCount(null);
+      setPrevPrizeCount(null);
+    }
+  }, [selectedMachine, selectedDate]);
 
   if (fetchingMachines) {
     return (
@@ -181,7 +227,8 @@ const MachineReport = () => {
                   id="report_date"
                   name="report_date"
                   type="date"
-                  defaultValue={today}
+                  value={selectedDate || ''}
+                  onChange={(e) => setSelectedDate(e.target.value)}
                   max={today}
                   required
                 />
@@ -195,6 +242,8 @@ const MachineReport = () => {
                   type="number"
                   min="0"
                   placeholder="0"
+                  value={todayCoinCount as number | undefined}
+                  onChange={(e) => setTodayCoinCount(e.target.value === '' ? '' : parseInt(e.target.value))}
                   required
                 />
               </div>
@@ -207,19 +256,40 @@ const MachineReport = () => {
                   type="number"
                   min="0"
                   placeholder="0"
+                  value={todayPrizeCount as number | undefined}
+                  onChange={(e) => setTodayPrizeCount(e.target.value === '' ? '' : parseInt(e.target.value))}
                   required
                 />
               </div>
             </div>
 
-            <div className="bg-muted/50 p-4 rounded-lg">
-              <h3 className="font-semibold mb-2">Report Instructions:</h3>
-              <ul className="text-sm text-muted-foreground space-y-1">
-                <li>• Count all coins collected from the machine today</li>
-                <li>• Count all prizes dispensed to customers today</li>
-                <li>• If a report already exists for this date, it will be updated</li>
-                <li>• Reports can only be entered for today or past dates</li>
-              </ul>
+            <div className="bg-muted/50 p-4 rounded-lg space-y-2">
+              <h3 className="font-semibold">Computed using previous values</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm">
+                <div>
+                  <div className="flex justify-between"><span>Previous Coin Count:</span><span className="font-semibold">{prevCoinCount ?? '-'}</span></div>
+                  <div className="flex justify-between"><span>Previous Prize Count:</span><span className="font-semibold">{prevPrizeCount ?? '-'}</span></div>
+                </div>
+                <div>
+                  {(() => {
+                    const machine = machines.find(m => m.id === selectedMachine);
+                    const coinPrice = machine?.coin_price ?? 0;
+                    const todayCoins = typeof todayCoinCount === 'number' ? todayCoinCount : 0;
+                    const todayPrizes = typeof todayPrizeCount === 'number' ? todayPrizeCount : 0;
+                    const sellCoins = prevCoinCount != null ? Math.max(0, todayCoins - prevCoinCount) : 0;
+                    const sellPrizes = prevPrizeCount != null ? Math.max(0, todayPrizes - prevPrizeCount) : 0;
+                    const income = sellCoins * coinPrice;
+                    return (
+                      <div className="space-y-1">
+                        <div className="flex justify-between"><span>Sell Coins (today - previous):</span><span className="font-semibold">{sellCoins}</span></div>
+                        <div className="flex justify-between"><span>Sell Income:</span><span className="font-semibold">{formatCurrencyBDT(income)}</span></div>
+                        <div className="flex justify-between"><span>Sell Prizes (today - previous):</span><span className="font-semibold">{sellPrizes}</span></div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+              <p className="text-xs text-muted-foreground">Previous values are fetched automatically based on the selected date and machine.</p>
             </div>
 
             <Button 

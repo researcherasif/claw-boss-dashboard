@@ -113,6 +113,8 @@ export type Database = {
           maintenance_percentage: number
           name: string
           profit_share_percentage: number
+          owner_profit_share_percentage: number
+          clowee_profit_share_percentage: number
           updated_at: string
           vat_percentage: number
         }
@@ -128,7 +130,9 @@ export type Database = {
           location: string
           maintenance_percentage: number
           name: string
-          profit_share_percentage: number
+          profit_share_percentage?: number
+          owner_profit_share_percentage?: number
+          clowee_profit_share_percentage?: number
           updated_at?: string
           vat_percentage: number
         }
@@ -145,10 +149,50 @@ export type Database = {
           maintenance_percentage?: number
           name?: string
           profit_share_percentage?: number
+          owner_profit_share_percentage?: number
+          clowee_profit_share_percentage?: number
           updated_at?: string
           vat_percentage?: number
         }
         Relationships: []
+      }
+      machine_change_logs: {
+        Row: {
+          id: string
+          machine_id: string
+          field: string
+          old_value: string | null
+          new_value: string | null
+          created_by: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          machine_id: string
+          field: string
+          old_value?: string | null
+          new_value?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          machine_id?: string
+          field?: string
+          old_value?: string | null
+          new_value?: string | null
+          created_by?: string | null
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_change_logs_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       pay_to_clowee: {
         Row: {
@@ -162,6 +206,8 @@ export type Database = {
           net_payable: number
           prize_cost: number
           profit_share_amount: number
+          owner_profit_share_amount: number
+          clowee_profit_share_amount: number
           start_date: string
           total_coins: number
           total_income: number
@@ -180,6 +226,8 @@ export type Database = {
           net_payable?: number
           prize_cost?: number
           profit_share_amount?: number
+          owner_profit_share_amount?: number
+          clowee_profit_share_amount?: number
           start_date: string
           total_coins?: number
           total_income?: number
@@ -198,6 +246,8 @@ export type Database = {
           net_payable?: number
           prize_cost?: number
           profit_share_amount?: number
+          owner_profit_share_amount?: number
+          clowee_profit_share_amount?: number
           start_date?: string
           total_coins?: number
           total_income?: number

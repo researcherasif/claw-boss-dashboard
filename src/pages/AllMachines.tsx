@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
+import { Switch } from '@/components/ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -19,6 +20,8 @@ interface Machine {
   electricity_cost: number;
   vat_percentage: number;
   profit_share_percentage: number;
+  owner_profit_share_percentage: number;
+  clowee_profit_share_percentage: number;
   maintenance_percentage: number;
   is_active: boolean;
 }
@@ -59,16 +62,35 @@ const AllMachines = () => {
     setSaving(true);
     try {
       const formData = new FormData(e.target as HTMLFormElement);
-      const updated = {
+      const ownerShare = parseFloat(formData.get('owner_profit_share_percentage') as string);
+      const cloweeShare = parseFloat(formData.get('clowee_profit_share_percentage') as string);
+
+      // Detect if split share columns exist; fallback to legacy profit_share_percentage
+      let supportsSplitShares = true;
+      try {
+        const t = await supabase
+          .from('machines')
+          .select('owner_profit_share_percentage, clowee_profit_share_percentage')
+          .limit(1);
+        if (t.error) supportsSplitShares = false;
+      } catch {
+        supportsSplitShares = false;
+      }
+
+      const baseUpdate: any = {
         name: formData.get('name') as string,
         location: formData.get('location') as string,
         coin_price: parseFloat(formData.get('coin_price') as string),
         doll_price: parseFloat(formData.get('doll_price') as string),
         electricity_cost: parseFloat(formData.get('electricity_cost') as string),
         vat_percentage: parseFloat(formData.get('vat_percentage') as string),
-        profit_share_percentage: parseFloat(formData.get('profit_share_percentage') as string),
         maintenance_percentage: parseFloat(formData.get('maintenance_percentage') as string),
       };
+
+      const updated = supportsSplitShares
+        ? { ...baseUpdate, owner_profit_share_percentage: ownerShare, clowee_profit_share_percentage: cloweeShare }
+        : { ...baseUpdate, profit_share_percentage: cloweeShare };
+
       const { error } = await supabase.from('machines').update(updated).eq('id', editing.id);
       if (error) throw error;
       toast({ title: 'Machine updated' });
@@ -78,6 +100,20 @@ const AllMachines = () => {
       toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const toggleActive = async (machine: Machine, nextActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('machines')
+        .update({ is_active: nextActive })
+        .eq('id', machine.id);
+      if (error) throw error;
+      toast({ title: nextActive ? 'Machine activated' : 'Machine deactivated' });
+      fetchMachines();
+    } catch (error: any) {
+      toast({ title: 'Status update failed', description: error.message, variant: 'destructive' });
     }
   };
 
@@ -139,9 +175,12 @@ const AllMachines = () => {
                   <TableCell>{formatCurrencyBDT(m.doll_price)}</TableCell>
                   <TableCell>{formatCurrencyBDT(m.electricity_cost)}</TableCell>
                   <TableCell>
-                    <span className={m.is_active ? 'text-green-600' : 'text-red-600'}>
-                      {m.is_active ? 'Active' : 'Inactive'}
-                    </span>
+                    <div className="flex items-center gap-2">
+                      <Switch checked={m.is_active} onCheckedChange={(val) => toggleActive(m, val)} />
+                      <span className={m.is_active ? 'text-green-600' : 'text-red-600'}>
+                        {m.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
                   </TableCell>
                   <TableCell className="space-x-2">
                     <Button size="sm" variant="outline" onClick={() => openEdit(m)}>
@@ -199,7 +238,10 @@ const AllMachines = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="profit_share_percentage">Profit Share %</Label>
-                  <Input id="profit_share_percentage" name="profit_share_percentage" type="number" step="0.01" defaultValue={editing.profit_share_percentage} required />
+                  <div className="grid grid-cols-2 gap-2">
+                    <Input id="owner_profit_share_percentage" name="owner_profit_share_percentage" type="number" step="0.01" defaultValue={editing.owner_profit_share_percentage} required placeholder="Owner %" />
+                    <Input id="clowee_profit_share_percentage" name="clowee_profit_share_percentage" type="number" step="0.01" defaultValue={editing.clowee_profit_share_percentage} required placeholder="Clowee %" />
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="maintenance_percentage">Maintenance %</Label>

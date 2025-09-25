@@ -32,8 +32,9 @@ interface CalculationResult {
   electricityCost: number;
   vatAmount: number;
   maintenanceCost: number;
-  profitShareAmount: number;
-  netPayable: number;
+  profitShareAmount: number; // Clowee share of profit base
+  totalAmount: number;
+  payToClowee: number;
 }
 
 const PayToClowee = () => {
@@ -79,51 +80,66 @@ const PayToClowee = () => {
       const startDate = formData.get('start_date') as string;
       const endDate = formData.get('end_date') as string;
 
-      // Fetch machine reports for the date range
-      const { data: reports, error } = await supabase
+      // Use cumulative counter logic: (latest on/before end) - (latest before start)
+      const { data: endReading, error: endErr } = await supabase
         .from('machine_reports')
-        .select('*')
+        .select('coin_count, prize_count')
         .eq('machine_id', selectedMachine.id)
-        .gte('report_date', startDate)
         .lte('report_date', endDate)
-        .order('report_date');
+        .order('report_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (endErr) throw endErr;
 
-      if (error) throw error;
+      const { data: startPrevReading, error: startPrevErr } = await supabase
+        .from('machine_reports')
+        .select('coin_count, prize_count')
+        .eq('machine_id', selectedMachine.id)
+        .lt('report_date', startDate)
+        .order('report_date', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (startPrevErr) throw startPrevErr;
 
-      if (!reports || reports.length === 0) {
-        toast({
-          title: "No reports found",
-          description: "No machine reports found for the selected date range.",
-          variant: "destructive",
-        });
-        setCalculationResult(null);
-        return;
-      }
+      const endCoins = endReading?.coin_count ?? 0;
+      const endPrizes = endReading?.prize_count ?? 0;
+      const startPrevCoins = startPrevReading?.coin_count ?? 0;
+      const startPrevPrizes = startPrevReading?.prize_count ?? 0;
 
-      // Calculate totals
-      const totalCoins = reports.reduce((sum, report) => sum + report.coin_count, 0);
-      const totalPrizes = reports.reduce((sum, report) => sum + report.prize_count, 0);
+      const totalCoins = Math.max(0, endCoins - startPrevCoins);
+      const totalPrizes = Math.max(0, endPrizes - startPrevPrizes);
 
       // Calculate amounts
       const totalIncome = totalCoins * selectedMachine.coin_price;
       const prizeCost = totalPrizes * selectedMachine.doll_price;
-      const electricityCost = selectedMachine.electricity_cost;
+      const electricityCostFull = selectedMachine.electricity_cost;
       const vatAmount = totalIncome * (selectedMachine.vat_percentage / 100);
       const maintenanceCost = totalIncome * (selectedMachine.maintenance_percentage / 100);
-      const profitShareAmount = totalIncome * (selectedMachine.profit_share_percentage / 100);
+      // Profit base = Total Income − (Prize Cost + VAT + Maintenance)
+      const profitBase = totalIncome - (prizeCost + vatAmount + maintenanceCost);
+      // Clowee share percent (default 50 if not set explicitly)
+      const cloweePercent = Number.isFinite(selectedMachine.profit_share_percentage)
+        ? selectedMachine.profit_share_percentage
+        : 50;
+      const profitShareAmount = profitBase * (cloweePercent / 100);
 
-      const netPayable = totalIncome - (prizeCost + electricityCost + vatAmount + maintenanceCost + profitShareAmount);
+      // Total Amount after deductions (full electricity here)
+      const totalAmount = totalIncome - (prizeCost + electricityCostFull + vatAmount + maintenanceCost);
+
+      // Pay To Clowee = Clowee Share + Prize Cost − Electricity (full)
+      const payToClowee = profitShareAmount + prizeCost - ( electricityCostFull / 2 );
 
       setCalculationResult({
         totalCoins,
         totalPrizes,
         totalIncome,
         prizeCost,
-        electricityCost,
+        electricityCost: electricityCostFull,
         vatAmount,
         maintenanceCost,
         profitShareAmount,
-        netPayable,
+        totalAmount,
+        payToClowee,
       });
 
     } catch (error: any) {
@@ -161,7 +177,7 @@ const PayToClowee = () => {
           vat_amount: calculationResult.vatAmount,
           maintenance_cost: calculationResult.maintenanceCost,
           profit_share_amount: calculationResult.profitShareAmount,
-          net_payable: calculationResult.netPayable,
+          net_payable: calculationResult.payToClowee,
           created_by: user.id,
         }]);
 
@@ -258,10 +274,10 @@ const PayToClowee = () => {
               {selectedMachine && (
                 <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                   <h3 className="font-semibold">Machine Settings:</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
+              <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>Coin Price: {formatCurrencyBDT(selectedMachine.coin_price)}</div>
                     <div>Doll Price: {formatCurrencyBDT(selectedMachine.doll_price)}</div>
-                    <div>Electricity: {formatCurrencyBDT(selectedMachine.electricity_cost)}</div>
+                <div>Electricity (50%): {formatCurrencyBDT(selectedMachine.electricity_cost / 2)}</div>
                     <div>VAT: {selectedMachine.vat_percentage}%</div>
                     <div>Profit Share: {selectedMachine.profit_share_percentage}%</div>
                     <div>Maintenance: {selectedMachine.maintenance_percentage}%</div>
@@ -289,57 +305,53 @@ const PayToClowee = () => {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="space-y-2">
-                  <div className="flex justify-between">
-                    <span>Total Coins:</span>
-                    <span className="font-semibold">{calculationResult.totalCoins}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total Prizes:</span>
-                    <span className="font-semibold">{calculationResult.totalPrizes}</span>
-                  </div>
+              <div className="grid gap-4 text-sm">
+                <div className="grid grid-cols-2">
+                  <div className="font-medium">Today Coin</div>
+                  <div className="text-right">{calculationResult.totalCoins}</div>
                 </div>
-                <div className="space-y-2">
-                  <div className="flex justify-between text-green-600">
-                    <span>Total Income:</span>
-                    <span className="font-semibold">{formatCurrencyBDT(calculationResult.totalIncome)}</span>
-                  </div>
+                <div className="grid grid-cols-2">
+                  <div className="font-medium">Today Prize</div>
+                  <div className="text-right">{calculationResult.totalPrizes}</div>
+                </div>
+                <div className="grid grid-cols-2">
+                  <div className="font-medium">Sell Coin × Price</div>
+                  <div className="text-right">{formatCurrencyBDT(calculationResult.totalIncome)}</div>
                 </div>
               </div>
 
               <Separator />
 
               <div className="space-y-2 text-sm">
-                <h4 className="font-semibold text-red-600">Deductions:</h4>
+                <h4 className="font-semibold">Breakdown:</h4>
                 <div className="flex justify-between">
                   <span>Prize Cost:</span>
-                  <span>- {formatCurrencyBDT(calculationResult.prizeCost)}</span>
+                  <span>{formatCurrencyBDT(calculationResult.prizeCost)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Electricity Cost:</span>
-                  <span>- {formatCurrencyBDT(calculationResult.electricityCost)}</span>
+                  <span>{formatCurrencyBDT(calculationResult.electricityCost)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>VAT Amount:</span>
-                  <span>- {formatCurrencyBDT(calculationResult.vatAmount)}</span>
+                  <span>{formatCurrencyBDT(calculationResult.vatAmount)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span>Maintenance Cost:</span>
-                  <span>- {formatCurrencyBDT(calculationResult.maintenanceCost)}</span>
+                  <span>{formatCurrencyBDT(calculationResult.maintenanceCost)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Profit Share:</span>
-                  <span>- {formatCurrencyBDT(calculationResult.profitShareAmount)}</span>
+                  <span>Clowee Profit Share ({selectedMachine?.profit_share_percentage}%):</span>
+                  <span>{formatCurrencyBDT(calculationResult.profitShareAmount)}</span>
                 </div>
               </div>
 
               <Separator />
 
               <div className="flex justify-between items-center text-lg font-bold">
-                <span>Net Payable to Clowee:</span>
-                <span className={calculationResult.netPayable >= 0 ? "text-green-600" : "text-red-600"}>
-                  {formatCurrencyBDT(calculationResult.netPayable)}
+                <span>Pay To Clowee:</span>
+                <span className={calculationResult.payToClowee >= 0 ? "text-green-600" : "text-red-600"}>
+                  {formatCurrencyBDT(calculationResult.payToClowee)}
                 </span>
               </div>
 
