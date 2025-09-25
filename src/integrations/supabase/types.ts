@@ -265,6 +265,80 @@ export type Database = {
           },
         ]
       }
+      payment_calculations: {
+        Row: {
+          id: string
+          entry_date: string
+          entry_time: string
+          machine_id: string
+          machine_name: string
+          start_date: string
+          end_date: string
+          total_coins: number
+          total_prizes: number
+          total_income: number
+          prize_cost: number
+          electricity_cost: number
+          vat_amount: number
+          maintenance_cost: number
+          profit_share_amount: number
+          pay_to_clowee: number
+          created_by: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          entry_date?: string
+          entry_time?: string
+          machine_id: string
+          machine_name: string
+          start_date: string
+          end_date: string
+          total_coins?: number
+          total_prizes?: number
+          total_income?: number
+          prize_cost?: number
+          electricity_cost?: number
+          vat_amount?: number
+          maintenance_cost?: number
+          profit_share_amount?: number
+          pay_to_clowee?: number
+          created_by: string
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          entry_date?: string
+          entry_time?: string
+          machine_id?: string
+          machine_name?: string
+          start_date?: string
+          end_date?: string
+          total_coins?: number
+          total_prizes?: number
+          total_income?: number
+          prize_cost?: number
+          electricity_cost?: number
+          vat_amount?: number
+          maintenance_cost?: number
+          profit_share_amount?: number
+          pay_to_clowee?: number
+          created_by?: string
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_calculations_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string

@@ -5,11 +5,13 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Calculator, Loader2, FileText } from 'lucide-react';
+import { Calculator, Loader2, FileText, History, Trash2, Printer, Download } from 'lucide-react';
 import { formatCurrencyBDT } from '@/lib/currency';
+import InvoiceGenerator from '@/components/invoices/InvoiceGenerator';
 
 interface Machine {
   id: string;
@@ -37,18 +39,46 @@ interface CalculationResult {
   payToClowee: number;
 }
 
+interface PaymentCalculation {
+  id: string;
+  entry_date: string;
+  entry_time: string;
+  machine_id: string;
+  machine_name: string;
+  start_date: string;
+  end_date: string;
+  total_coins: number;
+  total_prizes: number;
+  total_income: number;
+  prize_cost: number;
+  electricity_cost: number;
+  vat_amount: number;
+  maintenance_cost: number;
+  profit_share_amount: number;
+  pay_to_clowee: number;
+  created_at: string;
+}
+
 const PayToClowee = () => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
+  const [paymentCalculations, setPaymentCalculations] = useState<PaymentCalculation[]>([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [loadingHistory, setLoadingHistory] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
 
   useEffect(() => {
     fetchMachines();
   }, []);
+
+  useEffect(() => {
+    if (user) {
+      fetchPaymentCalculations();
+    }
+  }, [user]);
 
   const fetchMachines = async () => {
     try {
@@ -69,6 +99,30 @@ const PayToClowee = () => {
     }
   };
 
+  const fetchPaymentCalculations = async () => {
+    if (!user) return;
+    
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('payment_calculations')
+        .select('*')
+        .eq('created_by', user.id)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+      setPaymentCalculations(data || []);
+    } catch (error: any) {
+      toast({
+        title: "Error loading calculation history",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
   const handleCalculate = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedMachine || !user) return;
@@ -80,18 +134,31 @@ const PayToClowee = () => {
       const startDate = formData.get('start_date') as string;
       const endDate = formData.get('end_date') as string;
 
-      // Use cumulative counter logic: (latest on/before end) - (latest before start)
-      const { data: endReading, error: endErr } = await supabase
+      // Get the last entry within the date range
+      const { data: lastInRange, error: rangeError } = await supabase
         .from('machine_reports')
         .select('coin_count, prize_count')
         .eq('machine_id', selectedMachine.id)
+        .gte('report_date', startDate)
         .lte('report_date', endDate)
         .order('report_date', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (endErr) throw endErr;
 
-      const { data: startPrevReading, error: startPrevErr } = await supabase
+      if (rangeError) throw rangeError;
+
+      if (!lastInRange) {
+        toast({
+          title: "No reports found",
+          description: "No machine reports found for the selected date range.",
+          variant: "destructive",
+        });
+        setCalculationResult(null);
+        return;
+      }
+
+      // Get the last entry before the start date
+      const { data: lastBeforeStart, error: beforeError } = await supabase
         .from('machine_reports')
         .select('coin_count, prize_count')
         .eq('machine_id', selectedMachine.id)
@@ -99,15 +166,16 @@ const PayToClowee = () => {
         .order('report_date', { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (startPrevErr) throw startPrevErr;
+      if (beforeError) throw beforeError;
 
-      const endCoins = endReading?.coin_count ?? 0;
-      const endPrizes = endReading?.prize_count ?? 0;
-      const startPrevCoins = startPrevReading?.coin_count ?? 0;
-      const startPrevPrizes = startPrevReading?.prize_count ?? 0;
+      // Calculate totals: Last entry in range - Last entry before start
+      const lastInRangeCoins = lastInRange.coin_count || 0;
+      const lastInRangePrizes = lastInRange.prize_count || 0;
+      const lastBeforeCoins = lastBeforeStart?.coin_count || 0;
+      const lastBeforePrizes = lastBeforeStart?.prize_count || 0;
 
-      const totalCoins = Math.max(0, endCoins - startPrevCoins);
-      const totalPrizes = Math.max(0, endPrizes - startPrevPrizes);
+      const totalCoins = Math.max(0, lastInRangeCoins - lastBeforeCoins);
+      const totalPrizes = Math.max(0, lastInRangePrizes - lastBeforePrizes);
 
       // Calculate amounts
       const totalIncome = totalCoins * selectedMachine.coin_price;
@@ -163,10 +231,18 @@ const PayToClowee = () => {
       const startDate = formData.get('start_date') as string;
       const endDate = formData.get('end_date') as string;
 
+      // Get current date and time
+      const now = new Date();
+      const entryDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
+      const entryTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
+
       const { error } = await supabase
-        .from('pay_to_clowee')
+        .from('payment_calculations')
         .insert([{
+          entry_date: entryDate,
+          entry_time: entryTime,
           machine_id: selectedMachine.id,
+          machine_name: selectedMachine.name,
           start_date: startDate,
           end_date: endDate,
           total_coins: calculationResult.totalCoins,
@@ -177,7 +253,7 @@ const PayToClowee = () => {
           vat_amount: calculationResult.vatAmount,
           maintenance_cost: calculationResult.maintenanceCost,
           profit_share_amount: calculationResult.profitShareAmount,
-          net_payable: calculationResult.payToClowee,
+          pay_to_clowee: calculationResult.payToClowee,
           created_by: user.id,
         }]);
 
@@ -188,10 +264,10 @@ const PayToClowee = () => {
         description: "The payment calculation has been saved to records.",
       });
 
-      // Reset form and calculation
-      setCalculationResult(null);
-      setSelectedMachine(null);
-      (document.querySelector('form') as HTMLFormElement).reset();
+      // Refresh the calculation history
+      await fetchPaymentCalculations();
+
+      // Keep the current calculation visible and show invoice actions below
 
     } catch (error: any) {
       toast({
@@ -201,6 +277,31 @@ const PayToClowee = () => {
       });
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDeleteCalculation = async (id: string) => {
+    try {
+      const { error } = await supabase
+        .from('payment_calculations')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      toast({
+        title: "Calculation deleted",
+        description: "The payment calculation has been removed.",
+      });
+
+      // Refresh the calculation history
+      await fetchPaymentCalculations();
+    } catch (error: any) {
+      toast({
+        title: "Error deleting calculation",
+        description: error.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -274,7 +375,7 @@ const PayToClowee = () => {
               {selectedMachine && (
                 <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                   <h3 className="font-semibold">Machine Settings:</h3>
-              <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div className="grid grid-cols-2 gap-2 text-sm">
                     <div>Coin Price: {formatCurrencyBDT(selectedMachine.coin_price)}</div>
                     <div>Doll Price: {formatCurrencyBDT(selectedMachine.doll_price)}</div>
                 <div>Electricity (50%): {formatCurrencyBDT(selectedMachine.electricity_cost / 2)}</div>
@@ -309,11 +410,11 @@ const PayToClowee = () => {
                 <div className="grid grid-cols-2">
                   <div className="font-medium">Today Coin</div>
                   <div className="text-right">{calculationResult.totalCoins}</div>
-                </div>
+                  </div>
                 <div className="grid grid-cols-2">
                   <div className="font-medium">Today Prize</div>
                   <div className="text-right">{calculationResult.totalPrizes}</div>
-                </div>
+                  </div>
                 <div className="grid grid-cols-2">
                   <div className="font-medium">Sell Coin × Price</div>
                   <div className="text-right">{formatCurrencyBDT(calculationResult.totalIncome)}</div>
@@ -363,6 +464,132 @@ const PayToClowee = () => {
           </Card>
         )}
       </div>
+
+      {/* Inline Invoice Actions when a calculation exists */}
+      {calculationResult && selectedMachine && (
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5" />
+              Invoice
+            </CardTitle>
+            <CardDescription>
+              Preview and generate invoice for {selectedMachine.name}
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <InvoiceGenerator
+              company={{
+                name: 'i3 Technologies',
+                address: 'House #29, Flat #C2, 29, Katasur, Mohammadpur, Dhaka-1207',
+                mobile: '+8801325-886868',
+                email: 'support@i3technologies.com.bd',
+                website: 'www.sohub.com.bd/clowee',
+                logoUrl: '/i3-logo.png',
+              }}
+              client={{
+                name: selectedMachine.name,
+                address: selectedMachine.location,
+              }}
+              invoiceNumber={`INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${selectedMachine.id.slice(0,5)}`}
+              invoiceDate={new Date().toISOString().split('T')[0]}
+              items={[{
+                serial: 1,
+                description: 'Pay to Clowee - Machine Settlement',
+                period: (() => {
+                  const form = document.querySelector('form') as HTMLFormElement | null;
+                  const s = form ? (form.querySelector('#start_date') as HTMLInputElement)?.value : '';
+                  const e = form ? (form.querySelector('#end_date') as HTMLInputElement)?.value : '';
+                  return s && e ? `${s} to ${e}` : '';
+                })(),
+                total: calculationResult.payToClowee,
+              }]}
+              banks={[{
+                bankName: 'Midland Bank Limited',
+                branch: 'Gulshan',
+                accountName: 'i3 Technologies',
+                accountNumber: '0011-1050008790',
+              }]}
+              footerNotes={[
+                'Payment due upon receipt.',
+                'Please send deposit slip/screenshot after payment.',
+              ]}
+              rightLogoUrl={'/clowee-logo.png'}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Payment Calculation History */}
+      <Card className="mt-8">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <History className="h-5 w-5" />
+            Payment Calculation History
+          </CardTitle>
+          <CardDescription>
+            View and manage your saved payment calculations
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingHistory ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="ml-2">Loading history...</span>
+            </div>
+          ) : paymentCalculations.length === 0 ? (
+            <div className="text-center py-8 text-muted-foreground">
+              No payment calculations found. Create your first calculation above.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Entry Date</TableHead>
+                    <TableHead>Entry Time</TableHead>
+                    <TableHead>Machine</TableHead>
+                    <TableHead>Machine ID</TableHead>
+                    <TableHead>Start Date</TableHead>
+                    <TableHead>End Date</TableHead>
+                    <TableHead>Total Coins</TableHead>
+                    <TableHead>Total Prizes</TableHead>
+                    <TableHead>Pay To Clowee</TableHead>
+                    <TableHead>Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {paymentCalculations.map((calculation) => (
+                    <TableRow key={calculation.id}>
+                      <TableCell>{calculation.entry_date}</TableCell>
+                      <TableCell>{calculation.entry_time}</TableCell>
+                      <TableCell className="font-medium">{calculation.machine_name}</TableCell>
+                      <TableCell className="font-mono text-xs">{calculation.machine_id.slice(0, 8)}...</TableCell>
+                      <TableCell>{calculation.start_date}</TableCell>
+                      <TableCell>{calculation.end_date}</TableCell>
+                      <TableCell className="text-center font-medium">{calculation.total_coins.toLocaleString()}</TableCell>
+                      <TableCell className="text-center font-medium">{calculation.total_prizes.toLocaleString()}</TableCell>
+                      <TableCell className={calculation.pay_to_clowee >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+                        {formatCurrencyBDT(calculation.pay_to_clowee)}
+                      </TableCell>
+                      <TableCell>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleDeleteCalculation(calculation.id)}
+                          className="text-red-600 hover:text-red-700"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

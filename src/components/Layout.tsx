@@ -28,7 +28,7 @@ const Layout = () => {
       href: "/",
     },
     {
-      title: "Machines",
+      title: "Add Machines",
       icon: Plus,
       href: "/machines",
     },

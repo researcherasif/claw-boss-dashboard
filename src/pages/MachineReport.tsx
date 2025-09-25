@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -56,7 +56,7 @@ const MachineReport = () => {
     }
   };
 
-  const fetchPreviousReport = async (machineId: string, beforeDate: string) => {
+  const fetchPreviousReport = useCallback(async (machineId: string, beforeDate: string) => {
     try {
       if (!machineId || !beforeDate) return;
       const { data, error } = await supabase
@@ -74,7 +74,7 @@ const MachineReport = () => {
       setPrevCoinCount(null);
       setPrevPrizeCount(null);
     }
-  };
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,7 +165,7 @@ const MachineReport = () => {
       setPrevCoinCount(null);
       setPrevPrizeCount(null);
     }
-  }, [selectedMachine, selectedDate]);
+  }, [selectedMachine, selectedDate, fetchPreviousReport]);
 
   if (fetchingMachines) {
     return (

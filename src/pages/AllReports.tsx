@@ -303,14 +303,14 @@ const AllReports = () => {
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">All Reports</h1>
-        <p className="text-muted-foreground">Daily reports and machine change logs</p>
+        <h1 className="text-3xl font-bold tracking-tight">All Bills Reports</h1>
+        <p className="text-muted-foreground">Daily Bills reports and machine change logs</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Daily Reports</CardTitle>
-          <CardDescription>All entries from Machine Report</CardDescription>
+          <CardTitle>Bills Reports</CardTitle>
+          <CardDescription>All entries from Bills Report</CardDescription>
         </CardHeader>
         <CardContent>
           <Table>

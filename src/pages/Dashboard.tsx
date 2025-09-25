@@ -50,16 +50,29 @@ const Dashboard = () => {
 
       setMachines(machinesData || []);
 
+      // Fetch all reports in a single query to avoid N+1 problem
+      const { data: allReports, error: reportsError } = await supabase
+        .from('machine_reports')
+        .select('machine_id, coin_count, prize_count, report_date');
+
+      if (reportsError) throw reportsError;
+
+      // Group reports by machine_id
+      const reportsByMachine = (allReports || []).reduce((acc: any, report) => {
+        if (!acc[report.machine_id]) {
+          acc[report.machine_id] = [];
+        }
+        acc[report.machine_id].push(report);
+        return acc;
+      }, {});
+
       // Calculate summaries for each machine
       const summaries: MachineSummary[] = [];
       for (const machine of machinesData || []) {
-        const { data: reports } = await supabase
-          .from('machine_reports')
-          .select('*')
-          .eq('machine_id', machine.id);
+        const reports = reportsByMachine[machine.id] || [];
 
-        const totalCoins = reports?.reduce((sum, report) => sum + report.coin_count, 0) || 0;
-        const totalPrizes = reports?.reduce((sum, report) => sum + report.prize_count, 0) || 0;
+        const totalCoins = reports.reduce((sum: number, report: any) => sum + (report.coin_count || 0), 0);
+        const totalPrizes = reports.reduce((sum: number, report: any) => sum + (report.prize_count || 0), 0);
         
         const totalIncome = totalCoins * machine.coin_price;
         const prizeCost = totalPrizes * machine.doll_price;
@@ -75,7 +88,7 @@ const Dashboard = () => {
           totalIncome,
           totalProfit,
           totalPayable,
-          reportCount: reports?.length || 0,
+          reportCount: reports.length,
         });
       }
 
@@ -106,10 +119,16 @@ const Dashboard = () => {
     month: `Month ${index + 1}`,
   }));
 
-  const pieChartData = machineSummaries.map((summary) => ({
-    name: summary.machine.name,
-    value: summary.totalProfit,
-    location: summary.machine.location,
+  // Aggregate profit by location for distribution donut
+  const profitByLocation: Record<string, number> = machineSummaries.reduce((acc, s) => {
+    const loc = s.machine.location || 'Unknown';
+    acc[loc] = (acc[loc] || 0) + s.totalProfit;
+    return acc;
+  }, {} as Record<string, number>);
+
+  const pieChartData = Object.entries(profitByLocation).map(([location, value]) => ({
+    name: location,
+    value,
   }));
 
   const COLORS = ['hsl(var(--primary))', 'hsl(var(--secondary))', '#FFBB28', '#FF8042', '#0088FE'];
@@ -253,9 +272,10 @@ const Dashboard = () => {
                   data={pieChartData}
                   cx="50%"
                   cy="50%"
+                  innerRadius={60}
+                  outerRadius={100}
                   labelLine={false}
-                  label={({ name, value }) => `${name}: ${formatCurrencyBDT(Number(value))}`}
-                  outerRadius={80}
+                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   fill="#8884d8"
                   dataKey="value"
                 >

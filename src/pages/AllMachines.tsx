@@ -150,7 +150,7 @@ const AllMachines = () => {
 
       <Card>
         <CardHeader>
-          <CardTitle>Machines</CardTitle>
+          <CardTitle>Machines List</CardTitle>
           <CardDescription>List of all machines</CardDescription>
         </CardHeader>
         <CardContent>
