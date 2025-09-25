@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react';
 
 const AddMachine = () => {
   const [loading, setLoading] = useState(false);
+  const [depositType, setDepositType] = useState('');
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -54,6 +55,13 @@ const AddMachine = () => {
         duration: formData.get('duration') as string,
         location: formData.get('location') as string,
         installation_date: formData.get('installation_date') as string,
+        security_deposit_type: formData.get('security_deposit_type') as string,
+        security_deposit_amount: depositType === 'cash' ? parseFloat(formData.get('security_deposit_amount') as string) : null,
+        security_deposit_notes: depositType === 'cheque' 
+          ? formData.get('security_deposit_cheque') as string
+          : depositType === 'other'
+          ? formData.get('security_deposit_other') as string
+          : formData.get('security_deposit_notes') as string || null,
       } as any;
 
       const machineData = supportsSplitShares
@@ -90,17 +98,17 @@ const AddMachine = () => {
 
   return (
     <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">Add New Machine</h1>
-        <p className="text-muted-foreground">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Add New Machine</h1>
+        <p className="text-slate-400 mt-2 text-lg">
           Register a new claw machine in the system
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Machine Details</CardTitle>
-          <CardDescription>
+      <Card className="modern-card card-hover neon-glow">
+        <CardHeader className="pb-6">
+          <CardTitle className="text-2xl font-semibold text-slate-100">Machine Details</CardTitle>
+          <CardDescription className="text-slate-400 text-base">
             Enter all the required information for the new claw machine
           </CardDescription>
         </CardHeader>
@@ -246,10 +254,75 @@ const AddMachine = () => {
                   required
                 />
               </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="security_deposit_type">Security Deposit Type</Label>
+                <Select name="security_deposit_type" value={depositType} onValueChange={setDepositType} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select deposit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {depositType === 'cheque' && (
+                <div className="space-y-2">
+                  <Label htmlFor="security_deposit_cheque">Cheque Details</Label>
+                  <Input
+                    id="security_deposit_cheque"
+                    name="security_deposit_cheque"
+                    type="text"
+                    placeholder="Cheque number, bank name, etc."
+                    required
+                  />
+                </div>
+              )}
+
+              {depositType === 'cash' && (
+                <div className="space-y-2">
+                  <Label htmlFor="security_deposit_amount">Cash Amount (BDT)</Label>
+                  <Input
+                    id="security_deposit_amount"
+                    name="security_deposit_amount"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    placeholder="10000.00"
+                    required
+                  />
+                </div>
+              )}
+
+              {depositType === 'other' && (
+                <div className="space-y-2">
+                  <Label htmlFor="security_deposit_other">Other Details</Label>
+                  <Input
+                    id="security_deposit_other"
+                    name="security_deposit_other"
+                    type="text"
+                    placeholder="Describe the deposit type"
+                    required
+                  />
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-4 pt-4">
-              <Button type="submit" disabled={loading} className="flex-1">
+            <div className="space-y-2">
+              <Label htmlFor="security_deposit_notes">Security Deposit Notes</Label>
+              <Input
+                id="security_deposit_notes"
+                name="security_deposit_notes"
+                type="text"
+                placeholder="Additional notes about the security deposit"
+              />
+            </div>
+
+            <div className="flex gap-4 pt-6">
+              <Button type="submit" disabled={loading} className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 hover:scale-105">
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Machine
               </Button>
@@ -257,7 +330,7 @@ const AddMachine = () => {
                 type="button" 
                 variant="outline" 
                 onClick={() => navigate('/')}
-                className="flex-1"
+                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white py-3 rounded-lg transition-all duration-300"
               >
                 Cancel
               </Button>

@@ -115,6 +115,9 @@ export type Database = {
           profit_share_percentage: number
           owner_profit_share_percentage: number
           clowee_profit_share_percentage: number
+          security_deposit_type: string | null
+          security_deposit_amount: number | null
+          security_deposit_notes: string | null
           updated_at: string
           vat_percentage: number
         }
@@ -133,6 +136,9 @@ export type Database = {
           profit_share_percentage?: number
           owner_profit_share_percentage?: number
           clowee_profit_share_percentage?: number
+          security_deposit_type?: string | null
+          security_deposit_amount?: number | null
+          security_deposit_notes?: string | null
           updated_at?: string
           vat_percentage: number
         }
@@ -151,6 +157,9 @@ export type Database = {
           profit_share_percentage?: number
           owner_profit_share_percentage?: number
           clowee_profit_share_percentage?: number
+          security_deposit_type?: string | null
+          security_deposit_amount?: number | null
+          security_deposit_notes?: string | null
           updated_at?: string
           vat_percentage?: number
         }
@@ -187,6 +196,85 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "machine_change_logs_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      doll_price_history: {
+        Row: {
+          created_at: string
+          created_by: string
+          effective_date: string
+          id: string
+          machine_id: string
+          price: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          effective_date: string
+          id?: string
+          machine_id: string
+          price: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          effective_date?: string
+          id?: string
+          machine_id?: string
+          price?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "doll_price_history_machine_id_fkey"
+            columns: ["machine_id"]
+            isOneToOne: false
+            referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      machine_settings_history: {
+        Row: {
+          created_at: string
+          created_by: string
+          effective_date: string
+          field_name: string
+          field_value: string
+          id: string
+          machine_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          effective_date: string
+          field_name: string
+          field_value: string
+          id?: string
+          machine_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          effective_date?: string
+          field_name?: string
+          field_value?: string
+          id?: string
+          machine_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machine_settings_history_machine_id_fkey"
             columns: ["machine_id"]
             isOneToOne: false
             referencedRelation: "machines"

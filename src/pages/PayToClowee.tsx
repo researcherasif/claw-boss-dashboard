@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { Calculator, Loader2, FileText, History, Trash2, Printer, Download } from 'lucide-react';
 import { formatCurrencyBDT } from '@/lib/currency';
+import { getMachineSettingsForDate } from '@/lib/machineSettings';
 import InvoiceGenerator from '@/components/invoices/InvoiceGenerator';
 
 interface Machine {
@@ -177,18 +178,19 @@ const PayToClowee = () => {
       const totalCoins = Math.max(0, lastInRangeCoins - lastBeforeCoins);
       const totalPrizes = Math.max(0, lastInRangePrizes - lastBeforePrizes);
 
-      // Calculate amounts
-      const totalIncome = totalCoins * selectedMachine.coin_price;
-      const prizeCost = totalPrizes * selectedMachine.doll_price;
-      const electricityCostFull = selectedMachine.electricity_cost;
-      const vatAmount = totalIncome * (selectedMachine.vat_percentage / 100);
-      const maintenanceCost = totalIncome * (selectedMachine.maintenance_percentage / 100);
+      // Get machine settings for the end date (most recent settings in the period)
+      const settings = await getMachineSettingsForDate(selectedMachine.id, endDate);
+      
+      // Calculate amounts using dynamic settings
+      const totalIncome = totalCoins * settings.coin_price;
+      const prizeCost = totalPrizes * settings.doll_price;
+      const electricityCostFull = settings.electricity_cost;
+      const vatAmount = totalIncome * (settings.vat_percentage / 100);
+      const maintenanceCost = totalIncome * (settings.maintenance_percentage / 100);
       // Profit base = Total Income − (Prize Cost + VAT + Maintenance)
       const profitBase = totalIncome - (prizeCost + vatAmount + maintenanceCost);
-      // Clowee share percent (default 50 if not set explicitly)
-      const cloweePercent = Number.isFinite(selectedMachine.profit_share_percentage)
-        ? selectedMachine.profit_share_percentage
-        : 50;
+      // Clowee share percent from dynamic settings
+      const cloweePercent = settings.profit_share_percentage;
       const profitShareAmount = profitBase * (cloweePercent / 100);
 
       // Total Amount after deductions (full electricity here)
@@ -376,12 +378,8 @@ const PayToClowee = () => {
                 <div className="bg-muted/50 p-4 rounded-lg space-y-2">
                   <h3 className="font-semibold">Machine Settings:</h3>
                   <div className="grid grid-cols-2 gap-2 text-sm">
-                    <div>Coin Price: {formatCurrencyBDT(selectedMachine.coin_price)}</div>
-                    <div>Doll Price: {formatCurrencyBDT(selectedMachine.doll_price)}</div>
-                <div>Electricity (50%): {formatCurrencyBDT(selectedMachine.electricity_cost / 2)}</div>
-                    <div>VAT: {selectedMachine.vat_percentage}%</div>
-                    <div>Profit Share: {selectedMachine.profit_share_percentage}%</div>
-                    <div>Maintenance: {selectedMachine.maintenance_percentage}%</div>
+                    <div>All settings: Dynamic (varies by date)</div>
+                    <div>Current values shown in calculations</div>
                   </div>
                 </div>
               )}
@@ -442,7 +440,7 @@ const PayToClowee = () => {
                   <span>{formatCurrencyBDT(calculationResult.maintenanceCost)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span>Clowee Profit Share ({selectedMachine?.profit_share_percentage}%):</span>
+                  <span>Clowee Profit Share:</span>
                   <span>{formatCurrencyBDT(calculationResult.profitShareAmount)}</span>
                 </div>
               </div>

@@ -154,8 +154,8 @@ const Invoices = () => {
 
       invoiceContent.innerHTML = `
         <div style="text-align: center; margin-bottom: 40px;">
-          <h1 style="color: #8b5cf6; margin-bottom: 10px;">Clawee Business</h1>
-          <p style="color: #666; margin: 0;">Claw Machine Management System</p>
+          <h1 style="color: #8b5cf6; margin-bottom: 10px;">Clowee Accounting</h1>
+          <p style="color: #666; margin: 0;">Clowee Accountingm</p>
         </div>
         
         <div style="display: flex; justify-content: space-between; margin-bottom: 30px;">
@@ -206,7 +206,7 @@ const Invoices = () => {
         </div>
 
         <div style="margin-top: 40px; text-align: center; font-size: 12px; color: #666;">
-          <p>This invoice is generated automatically by Clawee Business Management System</p>
+          <p>This invoice is generated automatically by Clowee Accounting</p>
           <p>Generated on: ${new Date().toLocaleString()}</p>
         </div>
       `;

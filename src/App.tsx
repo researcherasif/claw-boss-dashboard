@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider } from "./components/AuthProvider";
+import { ThemeProvider } from "./components/ThemeProvider";
 import { usePerformanceMonitor } from "./utils/performance";
 import Layout from "./components/Layout";
 import Dashboard from "./pages/Dashboard";
@@ -15,6 +16,7 @@ import AllReports from "./pages/AllReports";
 import MachineReport from "./pages/MachineReport";
 import PayToClowee from "./pages/PayToClowee";
 import Invoices from "./pages/Invoices";
+import ManageMachines from "./pages/ManageMachines";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,11 +26,12 @@ const App = () => {
   usePerformanceMonitor();
 
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
+    <ThemeProvider defaultTheme="dark" storageKey="clowee-theme">
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <AuthProvider>
           <BrowserRouter>
             <Routes>
               <Route path="/auth" element={<Auth />} />
@@ -41,13 +44,15 @@ const App = () => {
                 <Route path="machine-report" element={<MachineReport />} />
                 <Route path="pay-to-clowee" element={<PayToClowee />} />
                 <Route path="invoices" element={<Invoices />} />
+                <Route path="manage-machines" element={<ManageMachines />} />
               </Route>
               <Route path="*" element={<NotFound />} />
             </Routes>
           </BrowserRouter>
-        </AuthProvider>
-      </TooltipProvider>
-    </QueryClientProvider>
+          </AuthProvider>
+        </TooltipProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   );
 };
 

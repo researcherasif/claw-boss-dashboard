@@ -6,6 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Pencil, Trash2, Plus } from 'lucide-react';
@@ -23,6 +24,11 @@ interface Machine {
   owner_profit_share_percentage: number;
   clowee_profit_share_percentage: number;
   maintenance_percentage: number;
+  duration: string;
+  installation_date: string;
+  security_deposit_type: string | null;
+  security_deposit_amount: number | null;
+  security_deposit_notes: string | null;
   is_active: boolean;
 }
 
@@ -85,6 +91,11 @@ const AllMachines = () => {
         electricity_cost: parseFloat(formData.get('electricity_cost') as string),
         vat_percentage: parseFloat(formData.get('vat_percentage') as string),
         maintenance_percentage: parseFloat(formData.get('maintenance_percentage') as string),
+        duration: formData.get('duration') as string,
+        installation_date: formData.get('installation_date') as string,
+        security_deposit_type: formData.get('security_deposit_type') as string,
+        security_deposit_amount: formData.get('security_deposit_amount') ? parseFloat(formData.get('security_deposit_amount') as string) : null,
+        security_deposit_notes: formData.get('security_deposit_notes') as string || null,
       };
 
       const updated = supportsSplitShares
@@ -162,6 +173,8 @@ const AllMachines = () => {
                 <TableHead>Coin Price</TableHead>
                 <TableHead>Doll Price</TableHead>
                 <TableHead>Electricity</TableHead>
+                <TableHead>Duration</TableHead>
+                <TableHead>Deposit Type</TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead>Action</TableHead>
               </TableRow>
@@ -174,6 +187,8 @@ const AllMachines = () => {
                   <TableCell>{formatCurrencyBDT(m.coin_price)}</TableCell>
                   <TableCell>{formatCurrencyBDT(m.doll_price)}</TableCell>
                   <TableCell>{formatCurrencyBDT(m.electricity_cost)}</TableCell>
+                  <TableCell>{m.duration?.replace('_', ' ')}</TableCell>
+                  <TableCell>{m.security_deposit_type || 'N/A'}</TableCell>
                   <TableCell>
                     <div className="flex items-center gap-2">
                       <Switch checked={m.is_active} onCheckedChange={(val) => toggleActive(m, val)} />
@@ -194,7 +209,7 @@ const AllMachines = () => {
               ))}
               {machines.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={7} className="text-center text-muted-foreground">
+                  <TableCell colSpan={9} className="text-center text-muted-foreground">
                     No machines found.
                   </TableCell>
                 </TableRow>
@@ -239,14 +254,58 @@ const AllMachines = () => {
                 <div className="space-y-2">
                   <Label htmlFor="profit_share_percentage">Profit Share %</Label>
                   <div className="grid grid-cols-2 gap-2">
-                    <Input id="owner_profit_share_percentage" name="owner_profit_share_percentage" type="number" step="0.01" defaultValue={editing.owner_profit_share_percentage} required placeholder="Owner %" />
-                    <Input id="clowee_profit_share_percentage" name="clowee_profit_share_percentage" type="number" step="0.01" defaultValue={editing.clowee_profit_share_percentage} required placeholder="Clowee %" />
+                    <Input 
+                      id="owner_profit_share_percentage" 
+                      name="owner_profit_share_percentage" 
+                      type="number" 
+                      step="0.01" 
+                      defaultValue={editing.owner_profit_share_percentage || 0} 
+                      required 
+                      placeholder="Owner %" 
+                    />
+                    <Input 
+                      id="clowee_profit_share_percentage" 
+                      name="clowee_profit_share_percentage" 
+                      type="number" 
+                      step="0.01" 
+                      defaultValue={editing.clowee_profit_share_percentage || editing.profit_share_percentage || 0} 
+                      required 
+                      placeholder="Clowee %" 
+                    />
                   </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="maintenance_percentage">Maintenance %</Label>
                   <Input id="maintenance_percentage" name="maintenance_percentage" type="number" step="0.01" defaultValue={editing.maintenance_percentage} required />
                 </div>
+                <div className="space-y-2">
+                  <Label htmlFor="duration">Duration</Label>
+                  <select id="duration" name="duration" defaultValue={editing.duration} required className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="half_month">Half Month</option>
+                    <option value="full_month">Full Month</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="installation_date">Installation Date</Label>
+                  <Input id="installation_date" name="installation_date" type="date" defaultValue={editing.installation_date} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="security_deposit_type">Security Deposit Type</Label>
+                  <select id="security_deposit_type" name="security_deposit_type" defaultValue={editing.security_deposit_type || ''} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
+                    <option value="">Select type</option>
+                    <option value="cheque">Cheque</option>
+                    <option value="cash">Cash</option>
+                    <option value="other">Other</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="security_deposit_amount">Security Deposit Amount</Label>
+                  <Input id="security_deposit_amount" name="security_deposit_amount" type="number" step="0.01" defaultValue={editing.security_deposit_amount || ''} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="security_deposit_notes">Security Deposit Notes</Label>
+                <Input id="security_deposit_notes" name="security_deposit_notes" type="text" defaultValue={editing.security_deposit_notes || ''} />
               </div>
               <div className="flex gap-2">
                 <Button type="submit" disabled={saving} className="flex-1">
