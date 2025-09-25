@@ -115,6 +115,7 @@ export type Database = {
           profit_share_percentage: number
           owner_profit_share_percentage: number
           clowee_profit_share_percentage: number
+          franchise_profit_share_percentage: number
           security_deposit_type: string | null
           security_deposit_amount: number | null
           security_deposit_notes: string | null
@@ -136,6 +137,7 @@ export type Database = {
           profit_share_percentage?: number
           owner_profit_share_percentage?: number
           clowee_profit_share_percentage?: number
+          franchise_profit_share_percentage?: number
           security_deposit_type?: string | null
           security_deposit_amount?: number | null
           security_deposit_notes?: string | null
@@ -157,6 +159,7 @@ export type Database = {
           profit_share_percentage?: number
           owner_profit_share_percentage?: number
           clowee_profit_share_percentage?: number
+          franchise_profit_share_percentage?: number
           security_deposit_type?: string | null
           security_deposit_amount?: number | null
           security_deposit_notes?: string | null

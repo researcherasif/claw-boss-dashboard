@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Input } from '@/components/ui/input';
 import { useAuth } from '@/hooks/useAuth';
 import { formatCurrencyBDT } from '@/lib/currency';
+import { formatDate } from '@/lib/dateFormat';
 import MachineSettingsManager from '@/components/MachineSettingsManager';
 import { MachineSettingHistory } from '@/lib/machineSettings';
 
@@ -197,7 +198,7 @@ const ManageMachines = () => {
                           : change.field_value}
                       </TableCell>
                       <TableCell>{change.effective_date}</TableCell>
-                      <TableCell>{new Date(change.created_at).toLocaleDateString()}</TableCell>
+                      <TableCell>{formatDate(change.created_at)}</TableCell>
                       <TableCell className="space-x-2">
                         <Button
                           size="sm"
@@ -231,7 +232,7 @@ const ManageMachines = () => {
         </Card>
 
         <Dialog open={!!editingChange} onOpenChange={(open) => !open && setEditingChange(null)}>
-          <DialogContent>
+          <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>Edit Setting Change</DialogTitle>
               <DialogDescription>

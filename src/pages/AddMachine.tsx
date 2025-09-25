@@ -12,8 +12,20 @@ import { Loader2 } from 'lucide-react';
 const AddMachine = () => {
   const [loading, setLoading] = useState(false);
   const [depositType, setDepositType] = useState('');
+  const [franchiseShare, setFranchiseShare] = useState(0);
+  const [cloweeShare, setCloweeShare] = useState(0);
   const { toast } = useToast();
   const navigate = useNavigate();
+
+  const handleFranchiseShareChange = (value: number) => {
+    setFranchiseShare(value);
+    setCloweeShare(100 - value);
+  };
+
+  const handleCloweeShareChange = (value: number) => {
+    setCloweeShare(value);
+    setFranchiseShare(100 - value);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,30 +34,19 @@ const AddMachine = () => {
     try {
       const formData = new FormData(e.target as HTMLFormElement);
       
-      const ownerShare = parseFloat(formData.get('owner_profit_share_percentage') as string);
+      const franchiseShare = parseFloat(formData.get('franchise_profit_share_percentage') as string);
       const cloweeShare = parseFloat(formData.get('clowee_profit_share_percentage') as string);
 
-      if (!Number.isFinite(ownerShare) || !Number.isFinite(cloweeShare)) {
+      if (!Number.isFinite(franchiseShare) || !Number.isFinite(cloweeShare)) {
         throw new Error('Please provide valid profit share percentages');
       }
 
-      if (ownerShare + cloweeShare > 100.0) {
-        throw new Error('Owner + Clowee profit share cannot exceed 100%');
-      }
-
-      // Detect if new share columns exist
-      let supportsSplitShares = true;
-      try {
-        const test = await supabase
-          .from('machines')
-          .select('owner_profit_share_percentage, clowee_profit_share_percentage')
-          .limit(1);
-        if (test.error) supportsSplitShares = false;
-      } catch {
-        supportsSplitShares = false;
+      if (franchiseShare + cloweeShare !== 100.0) {
+        throw new Error('Franchise + Clowee profit share must equal 100%');
       }
 
       const baseData = {
+        machine_number: formData.get('machine_number') as string,
         name: formData.get('name') as string,
         coin_price: parseFloat(formData.get('coin_price') as string),
         doll_price: parseFloat(formData.get('doll_price') as string),
@@ -57,23 +58,14 @@ const AddMachine = () => {
         installation_date: formData.get('installation_date') as string,
         security_deposit_type: formData.get('security_deposit_type') as string,
         security_deposit_amount: depositType === 'cash' ? parseFloat(formData.get('security_deposit_amount') as string) : null,
-        security_deposit_notes: depositType === 'cheque' 
-          ? formData.get('security_deposit_cheque') as string
-          : depositType === 'other'
-          ? formData.get('security_deposit_other') as string
-          : formData.get('security_deposit_notes') as string || null,
+        security_deposit_notes: formData.get('security_deposit_notes') as string || null,
       } as any;
 
-      const machineData = supportsSplitShares
-        ? {
-            ...baseData,
-            owner_profit_share_percentage: ownerShare,
-            clowee_profit_share_percentage: cloweeShare,
-          }
-        : {
-            ...baseData,
-            profit_share_percentage: cloweeShare,
-          };
+      const machineData = {
+        ...baseData,
+        franchise_profit_share_percentage: parseFloat(formData.get('franchise_profit_share_percentage') as string),
+        clowee_profit_share_percentage: parseFloat(formData.get('clowee_profit_share_percentage') as string),
+      };
 
       const { error } = await supabase.from('machines').insert([machineData]);
 
@@ -97,24 +89,35 @@ const AddMachine = () => {
   };
 
   return (
-    <div className="p-6 max-w-2xl mx-auto">
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">Add New Machine</h1>
-        <p className="text-slate-400 mt-2 text-lg">
+    <div className="p-3 sm:p-6 max-w-4xl mx-auto">
+      <div className="mb-6 sm:mb-8">
+        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Add New Machine</h1>
+        <p className="text-muted-foreground mt-2 text-base sm:text-lg">
           Register a new claw machine in the system
         </p>
       </div>
 
       <Card className="modern-card card-hover neon-glow">
         <CardHeader className="pb-6">
-          <CardTitle className="text-2xl font-semibold text-slate-100">Machine Details</CardTitle>
-          <CardDescription className="text-slate-400 text-base">
+          <CardTitle className="text-2xl font-semibold">Machine Details</CardTitle>
+          <CardDescription className="text-base">
             Enter all the required information for the new claw machine
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="machine_number">Machine Number</Label>
+                <Input
+                  id="machine_number"
+                  name="machine_number"
+                  type="text"
+                  placeholder="e.g., CM001"
+                  required
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label htmlFor="name">Machine Name</Label>
                 <Input
@@ -191,14 +194,16 @@ const AddMachine = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="owner_profit_share_percentage">Restaurant Owner Profit Share (%)</Label>
+                <Label htmlFor="franchise_profit_share_percentage">Franchise Profit Share (%)</Label>
                 <Input
-                  id="owner_profit_share_percentage"
-                  name="owner_profit_share_percentage"
+                  id="franchise_profit_share_percentage"
+                  name="franchise_profit_share_percentage"
                   type="number"
                   step="0.01"
                   min="0"
                   max="100"
+                  value={franchiseShare}
+                  onChange={(e) => handleFranchiseShareChange(parseFloat(e.target.value) || 0)}
                   placeholder="0.00"
                   required
                 />
@@ -213,6 +218,8 @@ const AddMachine = () => {
                   step="0.01"
                   min="0"
                   max="100"
+                  value={cloweeShare}
+                  onChange={(e) => handleCloweeShareChange(parseFloat(e.target.value) || 0)}
                   placeholder="30.00"
                   required
                 />
@@ -233,7 +240,7 @@ const AddMachine = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="duration">Duration</Label>
+                <Label htmlFor="duration">Payment Duration</Label>
                 <Select name="duration" required>
                   <SelectTrigger>
                     <SelectValue placeholder="Select duration" />
@@ -269,45 +276,41 @@ const AddMachine = () => {
                 </Select>
               </div>
 
-              {depositType === 'cheque' && (
-                <div className="space-y-2">
-                  <Label htmlFor="security_deposit_cheque">Cheque Details</Label>
-                  <Input
-                    id="security_deposit_cheque"
-                    name="security_deposit_cheque"
-                    type="text"
-                    placeholder="Cheque number, bank name, etc."
-                    required
-                  />
-                </div>
-              )}
-
-              {depositType === 'cash' && (
-                <div className="space-y-2">
-                  <Label htmlFor="security_deposit_amount">Cash Amount (BDT)</Label>
-                  <Input
-                    id="security_deposit_amount"
-                    name="security_deposit_amount"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    placeholder="10000.00"
-                    required
-                  />
-                </div>
-              )}
-
-              {depositType === 'other' && (
-                <div className="space-y-2">
-                  <Label htmlFor="security_deposit_other">Other Details</Label>
-                  <Input
-                    id="security_deposit_other"
-                    name="security_deposit_other"
-                    type="text"
-                    placeholder="Describe the deposit type"
-                    required
-                  />
-                </div>
+              {depositType && (
+                <>
+                  {depositType === 'cash' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="security_deposit_amount">Cash Amount (BDT)</Label>
+                      <Input
+                        id="security_deposit_amount"
+                        name="security_deposit_amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="10000.00"
+                        required
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="security_deposit_notes">
+                      {depositType === 'cheque' ? 'Cheque Details' : 
+                       depositType === 'cash' ? 'Cash Notes (Optional)' : 
+                       'Security Deposits Other Details'}
+                    </Label>
+                    <Input
+                      id="security_deposit_notes"
+                      name="security_deposit_notes"
+                      type="text"
+                      placeholder={
+                        depositType === 'cheque' ? 'Cheque number, bank name, etc.' :
+                        depositType === 'cash' ? 'Additional notes about cash deposit' :
+                        'Describe the deposit type'
+                      }
+                      required={depositType !== 'cash'}
+                    />
+                  </div>
+                </>
               )}
             </div>
 
@@ -321,8 +324,8 @@ const AddMachine = () => {
               />
             </div>
 
-            <div className="flex gap-4 pt-6">
-              <Button type="submit" disabled={loading} className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white font-semibold py-3 rounded-lg transition-all duration-300 hover:scale-105">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 pt-6">
+              <Button type="submit" disabled={loading} className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 font-semibold py-3 rounded-lg transition-all duration-300 hover:scale-105">
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Machine
               </Button>
@@ -330,7 +333,7 @@ const AddMachine = () => {
                 type="button" 
                 variant="outline" 
                 onClick={() => navigate('/')}
-                className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700/50 hover:text-white py-3 rounded-lg transition-all duration-300"
+                className="flex-1 py-3 rounded-lg transition-all duration-300"
               >
                 Cancel
               </Button>

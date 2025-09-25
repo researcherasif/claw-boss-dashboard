@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { Activity, DollarSign, TrendingUp, Zap, Plus, FileText, Receipt } from 'lucide-react';
+import { Activity, DollarSign, TrendingUp, Zap, FileText, Receipt } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { formatCurrencyBDT } from '@/lib/currency';
@@ -52,7 +52,7 @@ const Dashboard = () => {
 
       // Fetch all reports in a single query to avoid N+1 problem
       const { data: allReports, error: reportsError } = await supabase
-        .from('machine_reports')
+        .from('machine_counter_reports')
         .select('machine_id, coin_count, prize_count, report_date');
 
       if (reportsError) throw reportsError;
@@ -150,29 +150,26 @@ const Dashboard = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
+      <div className="flex flex-col gap-3 sm:gap-4">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">Dashboard</h1>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Overview of your claw machine business performance
           </p>
         </div>
-        <div className="flex gap-2">
-          <Button onClick={() => navigate('/add-machine')}>
-            <Plus className="h-4 w-4 mr-2" /> Add Machine
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Button variant="outline" onClick={() => navigate('/machine-report')} className="w-full sm:w-auto">
+            <FileText className="h-4 w-4 mr-2" /> <span className="sm:inline">View Reports</span>
           </Button>
-          <Button variant="outline" onClick={() => navigate('/machine-report')}>
-            <FileText className="h-4 w-4 mr-2" /> View Reports
-          </Button>
-          <Button variant="secondary" onClick={() => navigate('/invoices')}>
-            <Receipt className="h-4 w-4 mr-2" /> Generate Invoice
+          <Button variant="secondary" onClick={() => navigate('/invoices')} className="w-full sm:w-auto">
+            <Receipt className="h-4 w-4 mr-2" /> <span className="sm:inline">Generate Invoice</span>
           </Button>
         </div>
       </div>
 
       {/* Stats Cards */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Total Income</CardTitle>
@@ -227,14 +224,14 @@ const Dashboard = () => {
       </div>
 
       {/* Charts */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Profit Trends by Machine</CardTitle>
             <CardDescription>Monthly profit comparison across machines</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[350px]">
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
@@ -266,7 +263,7 @@ const Dashboard = () => {
             <CardDescription>Profit share by machine location</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={350}>
+            <ResponsiveContainer width="100%" height={250} className="sm:h-[350px]">
               <PieChart>
                 <Pie
                   data={pieChartData}
@@ -299,23 +296,23 @@ const Dashboard = () => {
         <CardContent>
           <div className="space-y-4">
             {machineSummaries.map((summary) => (
-              <div key={summary.machine.id} className="flex items-center justify-between p-4 border rounded-lg">
+              <div key={summary.machine.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3">
                 <div>
-                  <h3 className="font-semibold">{summary.machine.name}</h3>
-                  <p className="text-sm text-muted-foreground">{summary.machine.location}</p>
+                  <h3 className="font-semibold text-sm sm:text-base">{summary.machine.name}</h3>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{summary.machine.location}</p>
                 </div>
-                <div className="grid grid-cols-3 gap-4 text-right">
+                <div className="grid grid-cols-3 gap-2 sm:gap-4 text-right">
                   <div>
-                    <p className="text-sm text-muted-foreground">Income</p>
-                    <p className="font-semibold">{formatCurrencyBDT(summary.totalIncome)}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Income</p>
+                    <p className="font-semibold text-xs sm:text-sm">{formatCurrencyBDT(summary.totalIncome)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Profit</p>
-                    <p className="font-semibold">{formatCurrencyBDT(summary.totalProfit)}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Profit</p>
+                    <p className="font-semibold text-xs sm:text-sm">{formatCurrencyBDT(summary.totalProfit)}</p>
                   </div>
                   <div>
-                    <p className="text-sm text-muted-foreground">Payable</p>
-                    <p className="font-semibold">{formatCurrencyBDT(summary.totalPayable)}</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground">Payable</p>
+                    <p className="font-semibold text-xs sm:text-sm">{formatCurrencyBDT(summary.totalPayable)}</p>
                   </div>
                 </div>
               </div>

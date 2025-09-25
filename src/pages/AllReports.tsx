@@ -12,6 +12,7 @@ import { Loader2, Pencil, Trash2, FileDown } from 'lucide-react';
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
 import { formatCurrencyBDT } from '@/lib/currency';
+import { formatDate } from '@/lib/dateFormat';
 
 interface MachineReport {
   id: string;
@@ -63,7 +64,7 @@ const AllReports = () => {
       let reportData: any[] | null = null;
       let reportError: any = null;
       let resp = await supabase
-        .from('machine_reports')
+        .from('machine_counter_reports')
         .select(`*, machines (name, location, coin_price, doll_price, electricity_cost, vat_percentage, maintenance_percentage, owner_profit_share_percentage, clowee_profit_share_percentage)`)
         .order('report_date', { ascending: false });
       reportData = resp.data as any[] | null;
@@ -71,7 +72,7 @@ const AllReports = () => {
       if (reportError) {
         // Fallback without the new columns
         const fallback = await supabase
-          .from('machine_reports')
+          .from('machine_counter_reports')
           .select(`*, machines (name, location, coin_price, doll_price, electricity_cost, vat_percentage, maintenance_percentage)`)
           .order('report_date', { ascending: false });
         reportData = fallback.data as any[] | null;
@@ -121,7 +122,7 @@ const AllReports = () => {
       const profit_share = parseFloat((formData.get('profit_share_percentage') as string) || String((editingReport.machines as any).clowee_profit_share_percentage ?? (editingReport.machines as any).profit_share_percentage ?? 0));
 
       const { error } = await supabase
-        .from('machine_reports')
+        .from('machine_counter_reports')
         .update({ report_date, coin_count, prize_count })
         .eq('id', editingReport.id);
       if (error) throw error;
@@ -207,7 +208,7 @@ const AllReports = () => {
   const deleteReport = async (r: MachineReport) => {
     if (!confirm('Delete this report?')) return;
     try {
-      const { error } = await supabase.from('machine_reports').delete().eq('id', r.id);
+      const { error } = await supabase.from('machine_counter_reports').delete().eq('id', r.id);
       if (error) throw error;
       toast({ title: 'Report deleted' });
       fetchData();
@@ -301,10 +302,10 @@ const AllReports = () => {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-3 sm:p-6 space-y-4 sm:space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">All Bills Reports</h1>
-        <p className="text-muted-foreground">Daily Bills reports and machine change logs</p>
+        <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">All Bills Reports</h1>
+        <p className="text-muted-foreground text-sm sm:text-base">Daily Bills reports and machine change logs</p>
       </div>
 
       <Card>
@@ -312,7 +313,7 @@ const AllReports = () => {
           <CardTitle>Bills Reports</CardTitle>
           <CardDescription>All entries from Bills Report</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -336,7 +337,7 @@ const AllReports = () => {
                 const income = r.coin_count * settings.coin_price;
                 return (
                   <TableRow key={r.id}>
-                    <TableCell>{new Date(r.report_date).toLocaleDateString()}</TableCell>
+                    <TableCell>{formatDate(r.report_date)}</TableCell>
                     <TableCell>
                       <div className="font-semibold">{settings.name}</div>
                       <div className="text-sm text-muted-foreground">{settings.location}</div>
@@ -379,7 +380,7 @@ const AllReports = () => {
           <CardTitle>Machine Change Logs</CardTitle>
           <CardDescription>Configuration edits history</CardDescription>
         </CardHeader>
-        <CardContent>
+        <CardContent className="overflow-x-auto">
           <Table>
             <TableHeader>
               <TableRow>
@@ -394,7 +395,7 @@ const AllReports = () => {
             <TableBody>
               {logs.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell>{new Date(log.created_at).toLocaleString()}</TableCell>
+                  <TableCell>{formatDate(log.created_at)}</TableCell>
                   <TableCell>
                     <div className="font-semibold">{log.machines?.name}</div>
                     <div className="text-sm text-muted-foreground">{log.machines?.location}</div>
@@ -420,13 +421,13 @@ const AllReports = () => {
       </Card>
 
       <Dialog open={!!editingReport} onOpenChange={(open) => !open && closeEditReport()}>
-        <DialogContent>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Report</DialogTitle>
           </DialogHeader>
           {editingReport && (
             <form onSubmit={updateReport} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="report_date">Date</Label>
                   <Input id="report_date" name="report_date" type="date" defaultValue={editingReport.report_date} required />
@@ -464,7 +465,7 @@ const AllReports = () => {
                   <Input id="maintenance_percentage" name="maintenance_percentage" type="number" step="0.01" defaultValue={editingReport.machines.maintenance_percentage} required />
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex gap-2 pt-4 sticky bottom-0 bg-background border-t mt-6 pt-4">
                 <Button type="submit" disabled={saving} className="flex-1">
                   {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Changes
