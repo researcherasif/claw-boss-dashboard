@@ -17,17 +17,17 @@ import { TablePagination } from '@/components/TablePagination';
 
 interface Machine {
   id: string;
-  machine_number: string;
+  machine_number?: string;
   name: string;
   location: string;
   coin_price: number;
   doll_price: number;
   electricity_cost: number;
   vat_percentage: number;
-  profit_share_percentage: number;
-  owner_profit_share_percentage: number;
-  clowee_profit_share_percentage: number;
-  franchise_profit_share_percentage: number;
+  profit_share_percentage?: number;
+  owner_profit_share_percentage?: number;
+  clowee_profit_share_percentage?: number;
+  franchise_profit_share_percentage?: number;
   maintenance_percentage: number;
   duration: string;
   installation_date: string;
@@ -74,7 +74,7 @@ const AllMachines = () => {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      setMachines((data as Machine[]) || []);
+      setMachines(data || []);
     } catch (error: any) {
       toast({ title: 'Error loading machines', description: error.message, variant: 'destructive' });
     } finally {

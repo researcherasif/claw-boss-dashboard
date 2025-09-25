@@ -137,7 +137,7 @@ const PayToClowee = () => {
 
       // Get the last entry within the date range
       const { data: lastInRange, error: rangeError } = await supabase
-        .from('machine_reports')
+        .from('machine_counter_reports')
         .select('coin_count, prize_count')
         .eq('machine_id', selectedMachine.id)
         .gte('report_date', startDate)
@@ -160,7 +160,7 @@ const PayToClowee = () => {
 
       // Get the last entry before the start date
       const { data: lastBeforeStart, error: beforeError } = await supabase
-        .from('machine_reports')
+        .from('machine_counter_reports')
         .select('coin_count, prize_count')
         .eq('machine_id', selectedMachine.id)
         .lt('report_date', startDate)
