@@ -1,179 +1,152 @@
-import { useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '@/hooks/useAuth';
-import { Button } from '@/components/ui/button';
-import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
-import { BarChart3, Plus, FileText, Calculator, Receipt, Settings, LogOut, Loader2, ChevronDown, ChevronRight, Moon, Sun } from 'lucide-react';
-import { useTheme } from '@/components/ThemeProvider';
-import { Link, useLocation } from 'react-router-dom';
+import { Outlet, Link, useLocation } from "react-router-dom";
+import { SidebarProvider, useSidebar } from "./ui/sidebar";
+import { Button } from "./ui/button";
+import {
+  Sidebar,
+  SidebarHeader,
+  SidebarContent,
+  SidebarFooter,
+  SidebarTrigger,
+  SidebarItem,
+} from "./ui/sidebar";
+import {
+  Home,
+  Settings,
+  Users,
+  LogOut,
+  BarChart,
+  DollarSign,
+  Truck,
+  FileText,
+  Sun,
+  Moon,
+  DollarSignIcon,
+  FuelIcon,
+} from "lucide-react";
+import { useAuth } from "../hooks/useAuth";
+import { useTheme } from "./ThemeProvider"; // Make sure this path is correct
 
 const Layout = () => {
-  const { user, profile, loading, signOut } = useAuth();
-  const { theme, setTheme } = useTheme();
-  const location = useLocation();
-  const [machinesExpanded, setMachinesExpanded] = useState(true);
-
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
-    );
-  }
-
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  const menuItems = [
-    {
-      title: "Dashboard",
-      icon: BarChart3,
-      href: "/",
-    },
-    {
-      title: "All Bills",
-      icon: FileText,
-      href: "/all-reports",
-    },
-    {
-      title: "Machine Counter Report",
-      icon: FileText,
-      href: "/machine-counter-report",
-    },
-    {
-      title: "Pay to Clowee",
-      icon: Calculator,
-      href: "/pay-to-clowee",
-    },
-    {
-      title: "Invoices",
-      icon: Receipt,
-      href: "/invoices",
-    },
-  ];
-
-  const machineItems = [
-    {
-      title: "Add Machines",
-      icon: Plus,
-      href: "/machines",
-    },
-    {
-      title: "All Machines",
-      icon: FileText,
-      href: "/all-machines",
-    },
-    {
-      title: "Manage Machines",
-      icon: Settings,
-      href: "/manage-machines",
-    },
-  ];
-
-  const isMachineRoute = machineItems.some(item => location.pathname === item.href);
+  const { user, signOut } = useAuth();
+  const { setTheme, theme } = useTheme();
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full">
-        <Sidebar className="sidebar-glow border-r border-slate-700/50">
-          <SidebarHeader className="p-6 blue-gradient border-b border-sidebar-border">
-            <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Clowee Accounting</h1>
-            <p className="text-sm text-sidebar-foreground/90 font-medium">{profile?.name}</p>
-            <p className="text-xs text-sidebar-foreground/70 capitalize bg-sidebar-accent px-2 py-1 rounded-full inline-block">{profile?.role?.replace('_', ' ')}</p>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarMenu>
-              {menuItems.map((item) => (
-                <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton 
-                    asChild
-                    isActive={location.pathname === item.href}
-                    className="hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:translate-x-1 group"
-                  >
-                    <Link to={item.href}>
-                      <item.icon className="h-4 w-4 group-hover:scale-110 transition-transform" />
-                      <span>{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-              
-              <SidebarMenuItem>
-                <SidebarMenuButton 
-                  onClick={() => setMachinesExpanded(!machinesExpanded)}
-                  className="cursor-pointer hover:bg-primary/10 transition-all duration-300 group"
-                >
-                  {machinesExpanded ? 
-                    <ChevronDown className="h-4 w-4 group-hover:text-primary transition-colors" /> : 
-                    <ChevronRight className="h-4 w-4 group-hover:text-primary transition-colors" />
-                  }
-                  <span className="group-hover:text-primary transition-colors font-medium">Machines</span>
-                </SidebarMenuButton>
-                {machinesExpanded && (
-                  <div className="ml-4 mt-2 space-y-1 border-l border-sidebar-border pl-4">
-                    {machineItems.map((item) => (
-                      <SidebarMenuButton 
-                        key={item.href}
-                        asChild
-                        isActive={location.pathname === item.href}
-                        size="sm"
-                        className="hover:bg-primary/10 hover:text-primary transition-all duration-300 hover:translate-x-1"
-                      >
-                        <Link to={item.href}>
-                          <item.icon className="h-3 w-3" />
-                          <span className="text-sm">{item.title}</span>
-                        </Link>
-                      </SidebarMenuButton>
-                    ))}
-                  </div>
-                )}
-              </SidebarMenuItem>
-            </SidebarMenu>
-            <div className="mt-auto p-4 border-t border-sidebar-border">
-              <Button
-                variant="ghost"
-                className="w-full justify-start hover:bg-destructive/10 hover:text-destructive transition-all duration-300 group"
-                onClick={signOut}
-              >
-                <LogOut className="mr-2 h-4 w-4 group-hover:rotate-12 transition-transform duration-300" />
-                Sign Out
-              </Button>
-            </div>
-          </SidebarContent>
-        </Sidebar>
-        
-        <div className="flex-1 flex flex-col">
-          <header className="navbar-blur p-3 sm:p-4 flex items-center justify-between">
-            <SidebarTrigger className="text-slate-200 hover:bg-slate-700/50 hover:text-white transition-all duration-300 hover:scale-110" />
-            <div className="flex items-center gap-2 sm:gap-4">
-              <div className="text-xs sm:text-sm text-slate-300 font-medium tracking-wide hidden sm:block">
-                Welcome to Clowee Accounting
+      <div className="flex min-h-screen w-full bg-background">
+        <Sidebar className="border-r">
+          <SidebarHeader className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
+                  <span className="text-primary-foreground font-bold text-lg">
+                    C
+                  </span>
+                </div>
+                <div>
+                  <h1 className="text-foreground font-bold text-xl">CLOWEE</h1>
+                  <p className="text-muted-foreground text-sm">
+                    Business Management
+                  </p>
+                </div>
               </div>
               <Button
                 variant="ghost"
-                size="sm"
-                onClick={() => setTheme(theme === "light" ? "dark" : "light")}
-                className="h-8 w-8 sm:h-9 sm:w-9 rounded-full hover:bg-slate-700/50 transition-all duration-300 hover:scale-110"
+                size="icon"
+                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
               >
-                {theme === "light" ? (
-                  <Moon className="h-3 w-3 sm:h-4 sm:w-4 text-slate-400" />
-                ) : (
-                  <Sun className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-400" />
-                )}
+                <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+                <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+                <span className="sr-only">Toggle theme</span>
               </Button>
             </div>
-          </header>
-          
-          <main className="flex-1 overflow-auto gradient-bg min-h-screen">
-            <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-primary/10 via-background/0 to-background/0 pointer-events-none"></div>
-            <div className="relative z-10">
-              <Outlet />
+          </SidebarHeader>
+          <SidebarContent className="px-4">
+            <div className="mb-6">
+              <p className="text-muted-foreground text-xs px-4 mb-2">
+                Navigation
+              </p>
+              <NavItem to="/dashboard" icon={<Home size={18} />}>
+                Dashboard
+              </NavItem>
+              <NavItem to="/all-reports" icon={<BarChart size={18} />}>
+                All Reports
+              </NavItem>
+              <NavItem to="/pay-to-clowee" icon={<FuelIcon size={18} />}>
+                Pay to Clowee
+              </NavItem>
+              <NavItem to="/invoices" icon={<FileText size={18} />}>
+                Invoices
+              </NavItem>
             </div>
-          </main>
-        </div>
+            <div className="mb-6">
+              <p className="text-muted-foreground text-xs px-4 mb-2">
+                Management
+              </p>
+              <NavItem to="/all-machines" icon={<Truck size={18} />}>
+                All Machines
+              </NavItem>
+              <NavItem to="/machine-report" icon={<FileText size={18} />}>
+                Machine Report
+              </NavItem>
+            </div>
+          </SidebarContent>
+          <SidebarFooter className="p-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
+                <span className="text-secondary-foreground font-bold">
+                  {user?.email?.[0].toUpperCase()}
+                </span>
+              </div>
+              <div>
+                <p className="text-foreground font-semibold text-sm">
+                  {user?.email}
+                </p>
+                <p className="text-muted-foreground text-xs">Operator</p>
+              </div>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="ml-auto"
+              onClick={signOut}
+            >
+              <LogOut size={18} />
+            </Button>
+          </SidebarFooter>
+        </Sidebar>
+        <main className="flex-1 flex flex-col">
+          <header className="h-16 flex items-center px-6 border-b lg:hidden">
+            <SidebarTrigger />
+            <h1 className="text-lg font-semibold ml-4">Dashboard</h1>
+          </header>
+          <div className="flex-1 p-6 overflow-auto">
+            <Outlet />
+          </div>
+        </main>
       </div>
     </SidebarProvider>
+  );
+};
+
+const NavItem = ({ to, icon, children }) => {
+  const { pathname } = useLocation();
+  const isActive = pathname === to;
+
+  return (
+    <Link
+      to={to}
+      className={`
+        flex items-center gap-3 px-4 py-2 rounded-lg transition-colors
+        ${
+          isActive
+            ? "bg-sidebar-accent text-sidebar-accent-foreground"
+            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
+        }
+      `}
+    >
+      {icon}
+      <span className="font-medium">{children}</span>
+    </Link>
   );
 };
 

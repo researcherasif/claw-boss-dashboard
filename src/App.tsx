@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./components/AuthProvider";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { usePerformanceMonitor } from "./utils/performance";
@@ -18,6 +18,7 @@ import PayToClowee from "./pages/PayToClowee";
 import Invoices from "./pages/Invoices";
 import ManageMachines from "./pages/ManageMachines";
 import NotFound from "./pages/NotFound";
+import "./sohub-theme.css";
 
 const queryClient = new QueryClient();
 
@@ -27,31 +28,34 @@ const App = () => {
 
   return (
     <ThemeProvider defaultTheme="dark" storageKey="clowee-theme">
-      <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <AuthProvider>
-          <BrowserRouter>
-            <Routes>
-              <Route path="/auth" element={<Auth />} />
-              <Route path="/" element={<Layout />}>
-                <Route index element={<Dashboard />} />
-                <Route path="add-machine" element={<AddMachine />} />
-                <Route path="machines" element={<Machines />} />
-                <Route path="all-machines" element={<AllMachines />} />
-                <Route path="all-reports" element={<AllReports />} />
-                <Route path="machine-counter-report" element={<MachineReport />} />
-                <Route path="pay-to-clowee" element={<PayToClowee />} />
-                <Route path="invoices" element={<Invoices />} />
-                <Route path="manage-machines" element={<ManageMachines />} />
-              </Route>
-              <Route path="*" element={<NotFound />} />
-            </Routes>
-          </BrowserRouter>
-          </AuthProvider>
-        </TooltipProvider>
-      </QueryClientProvider>
+      <div className="min-h-screen">
+        <QueryClientProvider client={queryClient}>
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <AuthProvider>
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/auth" element={<Auth />} />
+                  <Route path="/" element={<Layout />}>
+                    <Route index element={<Navigate to="/dashboard" />} />
+                    <Route path="dashboard" element={<Dashboard />} />
+                    <Route path="add-machine" element={<AddMachine />} />
+                    <Route path="machines" element={<Machines />} />
+                    <Route path="all-machines" element={<AllMachines />} />
+                    <Route path="all-reports" element={<AllReports />} />
+                    <Route path="machine-report" element={<MachineReport />} />
+                    <Route path="pay-to-clowee" element={<PayToClowee />} />
+                    <Route path="invoices" element={<Invoices />} />
+                    <Route path="manage-machines" element={<ManageMachines />} />
+                  </Route>
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </BrowserRouter>
+            </AuthProvider>
+          </TooltipProvider>
+        </QueryClientProvider>
+      </div>
     </ThemeProvider>
   );
 };

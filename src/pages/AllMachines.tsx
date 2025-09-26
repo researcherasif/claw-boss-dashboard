@@ -186,12 +186,12 @@ const AllMachines = () => {
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead className="min-w-[80px]">Machine #</TableHead>
-                <TableHead className="min-w-[120px]">Name</TableHead>
+                <TableHead className="min-w-[50px]">Machine #</TableHead>
+                <TableHead className="min-w-[80px]">Name</TableHead>
                 <TableHead className="min-w-[100px]">Location</TableHead>
                 <TableHead className="min-w-[80px]">Coin Price</TableHead>
                 <TableHead className="min-w-[80px]">Doll Price</TableHead>
-                <TableHead className="min-w-[80px]">Electricity</TableHead>
+                {/* <TableHead className="min-w-[80px]">Electricity</TableHead> */}
                 <TableHead className="min-w-[100px]">Duration</TableHead>
                 <TableHead className="min-w-[80px]">Deposit</TableHead>
                 <TableHead className="min-w-[80px]">Status</TableHead>
@@ -208,7 +208,7 @@ const AllMachines = () => {
                   <TableCell>{m.location}</TableCell>
                   <TableCell>{formatCurrencyBDT(m.coin_price)}</TableCell>
                   <TableCell>{formatCurrencyBDT(m.doll_price)}</TableCell>
-                  <TableCell>{formatCurrencyBDT(m.electricity_cost)}</TableCell>
+                  {/* <TableCell>{formatCurrencyBDT(m.electricity_cost)}</TableCell> */}
                   <TableCell>{m.duration?.replace('_', ' ')}</TableCell>
                   <TableCell>{m.security_deposit_type || 'N/A'}</TableCell>
                   <TableCell>
