@@ -1,153 +1,240 @@
-import { Outlet, Link, useLocation } from "react-router-dom";
-import { SidebarProvider, useSidebar } from "./ui/sidebar";
-import { Button } from "./ui/button";
-import {
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarFooter,
-  SidebarTrigger,
-  SidebarItem,
-} from "./ui/sidebar";
-import {
-  Home,
-  Settings,
-  Users,
-  LogOut,
-  BarChart,
-  DollarSign,
-  Truck,
-  FileText,
-  Sun,
-  Moon,
-  DollarSignIcon,
-  FuelIcon,
-} from "lucide-react";
-import { useAuth } from "../hooks/useAuth";
-import { useTheme } from "./ThemeProvider"; // Make sure this path is correct
+import { useState } from 'react';
+import { Navigate, Outlet } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
+import { Button } from '@/components/ui/button';
+import { Sidebar, SidebarContent, SidebarHeader, SidebarMenu, SidebarMenuItem, SidebarMenuButton, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar';
+import { BarChart3, Plus, FileText, Calculator, Receipt, Settings, LogOut, Loader2, ChevronDown, ChevronRight, Edit, Bell, User, Building2 } from 'lucide-react';
+import { useTheme } from '@/components/ThemeProvider';
+import { Link, useLocation } from 'react-router-dom';
 
 const Layout = () => {
-  const { user, signOut } = useAuth();
-  const { setTheme, theme } = useTheme();
+  const { user, profile, loading, signOut } = useAuth();
+  const { theme, setTheme } = useTheme();
+  const location = useLocation();
+  const [machinesExpanded, setMachinesExpanded] = useState(true);
+  const [franchisesExpanded, setFranchisesExpanded] = useState(true);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Navigate to="/auth" replace />;
+  }
+
+  const menuItems = [
+    {
+      title: "Dashboard",
+      icon: BarChart3,
+      href: "/",
+    },
+    {
+      title: "All Bills",
+      icon: FileText,
+      href: "/all-reports",
+    },
+    {
+      title: "Machine Counter Report",
+      icon: FileText,
+      href: "/machine-counter-report",
+    },
+    {
+      title: "Pay to Clowee",
+      icon: Calculator,
+      href: "/pay-to-clowee",
+    },
+    {
+      title: "Invoices",
+      icon: Receipt,
+      href: "/invoices",
+    },
+  ];
+
+  const franchiseItems = [
+    {
+      title: "Add Franchise",
+      icon: Plus,
+      href: "/add-franchise",
+    },
+    {
+      title: "All Franchises",
+      icon: Building2,
+      href: "/all-franchises",
+    },
+  ];
+
+  const machineItems = [
+    {
+      title: "Add Machine",
+      icon: Plus,
+      href: "/add-machine",
+    },
+    {
+      title: "All Machines",
+      icon: FileText,
+      href: "/all-machines",
+    },
+    {
+      title: "Manage Machines",
+      icon: Settings,
+      href: "/manage-machines",
+    },
+  ];
 
   return (
     <SidebarProvider>
-      <div className="flex min-h-screen w-full bg-background">
-        <Sidebar className="border-r">
-          <SidebarHeader className="p-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                  <span className="text-primary-foreground font-bold text-lg">
-                    C
-                  </span>
-                </div>
-                <div>
-                  <h1 className="text-foreground font-bold text-xl">CLOWEE</h1>
-                  <p className="text-muted-foreground text-sm">
-                    Business Management
-                  </p>
-                </div>
+      <div className="flex min-h-screen w-full" style={{background: '#0f1419'}}>
+        <Sidebar className="sohub-sidebar">
+          <SidebarHeader className="p-6">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-cyan-500 rounded-lg flex items-center justify-center">
+                <span className="text-white font-bold text-sm">C</span>
               </div>
-              <Button
-                variant="ghost"
-                size="icon"
-                onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-              >
-                <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-                <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
-                <span className="sr-only">Toggle theme</span>
-              </Button>
+              <div>
+                <h1 className="text-white font-bold text-lg">CLOWEE CONTROLS</h1>
+                <p className="text-gray-400 text-xs">Business Management</p>
+              </div>
             </div>
           </SidebarHeader>
           <SidebarContent className="px-4">
             <div className="mb-6">
-              <p className="text-muted-foreground text-xs px-4 mb-2">
-                Navigation
-              </p>
-              <NavItem to="/dashboard" icon={<Home size={18} />}>
-                Dashboard
-              </NavItem>
-              <NavItem to="/all-reports" icon={<BarChart size={18} />}>
-                All Reports
-              </NavItem>
-              <NavItem to="/pay-to-clowee" icon={<FuelIcon size={18} />}>
-                Pay to Clowee
-              </NavItem>
-              <NavItem to="/invoices" icon={<FileText size={18} />}>
-                Invoices
-              </NavItem>
+              <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">Overview</h3>
             </div>
-            <div className="mb-6">
-              <p className="text-muted-foreground text-xs px-4 mb-2">
-                Management
-              </p>
-              <NavItem to="/all-machines" icon={<Truck size={18} />}>
-                All Machines
-              </NavItem>
-              <NavItem to="/machine-report" icon={<FileText size={18} />}>
-                Machine Report
-              </NavItem>
+            <SidebarMenu>
+              {menuItems.map((item) => (
+                <SidebarMenuItem key={item.href}>
+                  <SidebarMenuButton 
+                    asChild
+                    className={`sohub-nav-item ${location.pathname === item.href ? 'active' : ''}`}
+                  >
+                    <Link to={item.href}>
+                      <item.icon className="h-4 w-4" />
+                      <span>{item.title}</span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+              
+              <div className="mt-6">
+                <h3 className="text-gray-400 text-xs uppercase tracking-wider mb-3">Business & Control</h3>
+                
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    onClick={() => setFranchisesExpanded(!franchisesExpanded)}
+                    className="sohub-nav-item cursor-pointer"
+                  >
+                    {franchisesExpanded ? 
+                      <ChevronDown className="h-4 w-4" /> : 
+                      <ChevronRight className="h-4 w-4" />
+                    }
+                    <span>Franchises</span>
+                  </SidebarMenuButton>
+                  {franchisesExpanded && (
+                    <div className="ml-6 mt-2 space-y-1">
+                      {franchiseItems.map((item) => (
+                        <SidebarMenuButton 
+                          key={item.href}
+                          asChild
+                          size="sm"
+                          className={`sohub-nav-item ${location.pathname === item.href ? 'active' : ''}`}
+                        >
+                          <Link to={item.href}>
+                            <item.icon className="h-3 w-3" />
+                            <span className="text-sm">{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      ))}
+                    </div>
+                  )}
+                </SidebarMenuItem>
+
+                <SidebarMenuItem>
+                  <SidebarMenuButton 
+                    onClick={() => setMachinesExpanded(!machinesExpanded)}
+                    className="sohub-nav-item cursor-pointer"
+                  >
+                    {machinesExpanded ? 
+                      <ChevronDown className="h-4 w-4" /> : 
+                      <ChevronRight className="h-4 w-4" />
+                    }
+                    <span>Machines</span>
+                  </SidebarMenuButton>
+                  {machinesExpanded && (
+                    <div className="ml-6 mt-2 space-y-1">
+                      {machineItems.map((item) => (
+                        <SidebarMenuButton 
+                          key={item.href}
+                          asChild
+                          size="sm"
+                          className={`sohub-nav-item ${location.pathname === item.href ? 'active' : ''}`}
+                        >
+                          <Link to={item.href}>
+                            <item.icon className="h-3 w-3" />
+                            <span className="text-sm">{item.title}</span>
+                          </Link>
+                        </SidebarMenuButton>
+                      ))}
+                    </div>
+                  )}
+                </SidebarMenuItem>
+              </div>
+            </SidebarMenu>
+            <div className="mt-auto p-4">
+              <Button
+                variant="ghost"
+                className="sohub-nav-item w-full justify-start text-red-400 hover:text-red-300"
+                onClick={signOut}
+              >
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
             </div>
           </SidebarContent>
-          <SidebarFooter className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-secondary rounded-full flex items-center justify-center">
-                <span className="text-secondary-foreground font-bold">
-                  {user?.email?.[0].toUpperCase()}
-                </span>
-              </div>
-              <div>
-                <p className="text-foreground font-semibold text-sm">
-                  {user?.email}
-                </p>
-                <p className="text-muted-foreground text-xs">Operator</p>
+        </Sidebar>
+        
+        <div className="flex-1 flex flex-col">
+          <header className="sohub-topbar p-4 flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <SidebarTrigger className="text-gray-400 hover:text-white" />
+              <div className="text-gray-400 text-sm">
+                {new Date().toLocaleDateString('en-US', { 
+                  weekday: 'long', 
+                  year: 'numeric', 
+                  month: 'long', 
+                  day: 'numeric' 
+                })}
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="ml-auto"
-              onClick={signOut}
-            >
-              <LogOut size={18} />
-            </Button>
-          </SidebarFooter>
-        </Sidebar>
-        <main className="flex-1 flex flex-col">
-          <header className="h-16 flex items-center px-6 border-b lg:hidden">
-            <SidebarTrigger />
-            <h1 className="text-lg font-semibold ml-4">Dashboard</h1>
+            <div className="flex items-center gap-3">
+              <Button className="sohub-button flex items-center gap-2">
+                <Edit className="h-4 w-4" />
+                Edit Dashboard
+              </Button>
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                <Bell className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                <Settings className="h-4 w-4" />
+              </Button>
+              <Button variant="ghost" size="sm" className="text-gray-400 hover:text-white">
+                <User className="h-4 w-4" />
+              </Button>
+            </div>
           </header>
-          <div className="flex-1 p-6 overflow-auto">
+          
+          <main className="flex-1 overflow-auto" style={{background: '#0f1419'}}>
             <Outlet />
-          </div>
-        </main>
+          </main>
+        </div>
       </div>
     </SidebarProvider>
   );
 };
 
-const NavItem = ({ to, icon, children }) => {
-  const { pathname } = useLocation();
-  const isActive = pathname === to;
 
-  return (
-    <Link
-      to={to}
-      className={`
-        flex items-center gap-3 px-4 py-2 rounded-lg transition-colors
-        ${
-          isActive
-            ? "bg-sidebar-accent text-sidebar-accent-foreground"
-            : "text-sidebar-foreground hover:bg-sidebar-accent/50"
-        }
-      `}
-    >
-      {icon}
-      <span className="font-medium">{children}</span>
-    </Link>
-  );
-};
 
 export default Layout;

@@ -15,7 +15,6 @@ interface Machine {
   doll_price: number;
   electricity_cost: number;
   location: string;
-  is_active: boolean;
 }
 
 interface MachineSummary {
@@ -43,7 +42,6 @@ const Dashboard = () => {
       const { data: machinesData, error: machinesError } = await supabase
         .from('machines')
         .select('*')
-        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (machinesError) throw machinesError;
