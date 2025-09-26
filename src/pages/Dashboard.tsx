@@ -11,10 +11,8 @@ import { formatCurrencyBDT } from '@/lib/currency';
 interface Machine {
   id: string;
   name: string;
-  coin_price: number;
-  doll_price: number;
-  electricity_cost: number;
-  location: string;
+  branch_location: string;
+  franchise_id: string;
 }
 
 interface MachineSummary {
@@ -38,10 +36,21 @@ const Dashboard = () => {
 
   const fetchDashboardData = async () => {
     try {
-      // Fetch machines
+      // Fetch machines with franchise data
       const { data: machinesData, error: machinesError } = await supabase
         .from('machines')
-        .select('*')
+        .select(`
+          *,
+          franchises!inner(
+            coin_price,
+            doll_price,
+            electricity_cost,
+            vat_percentage,
+            maintenance_percentage,
+            clowee_profit_share_percentage
+          )
+        `)
+        .eq('is_active', true)
         .order('created_at', { ascending: false });
 
       if (machinesError) throw machinesError;
@@ -72,13 +81,14 @@ const Dashboard = () => {
         const totalCoins = reports.reduce((sum: number, report: any) => sum + (report.coin_count || 0), 0);
         const totalPrizes = reports.reduce((sum: number, report: any) => sum + (report.prize_count || 0), 0);
         
-        const totalIncome = totalCoins * machine.coin_price;
-        const prizeCost = totalPrizes * machine.doll_price;
-        const vatAmount = totalIncome * (machine.vat_percentage / 100);
-        const maintenanceCost = totalIncome * (machine.maintenance_percentage / 100);
-        const profitShareAmount = totalIncome * ((machine.clowee_profit_share_percentage || 0) / 100);
+        const franchise = machine.franchises;
+        const totalIncome = totalCoins * franchise.coin_price;
+        const prizeCost = totalPrizes * franchise.doll_price;
+        const vatAmount = totalIncome * (franchise.vat_percentage / 100);
+        const maintenanceCost = totalIncome * (franchise.maintenance_percentage / 100);
+        const profitShareAmount = totalIncome * (franchise.clowee_profit_share_percentage / 100);
         
-        const totalPayable = totalIncome - (prizeCost + machine.electricity_cost + vatAmount + maintenanceCost + profitShareAmount);
+        const totalPayable = totalIncome - (prizeCost + franchise.electricity_cost + vatAmount + maintenanceCost + profitShareAmount);
         const totalProfit = totalPayable; // Simplified profit calculation
 
         summaries.push({
@@ -119,7 +129,7 @@ const Dashboard = () => {
 
   // Aggregate profit by location for distribution donut
   const profitByLocation: Record<string, number> = machineSummaries.reduce((acc, s) => {
-    const loc = s.machine.location || 'Unknown';
+    const loc = s.machine.branch_location || 'Unknown';
     acc[loc] = (acc[loc] || 0) + s.totalProfit;
     return acc;
   }, {} as Record<string, number>);
@@ -297,7 +307,7 @@ const Dashboard = () => {
               <div key={summary.machine.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 border rounded-lg gap-3">
                 <div>
                   <h3 className="font-semibold text-sm sm:text-base">{summary.machine.name}</h3>
-                  <p className="text-xs sm:text-sm text-muted-foreground">{summary.machine.location}</p>
+                  <p className="text-xs sm:text-sm text-muted-foreground">{summary.machine.branch_location}</p>
                 </div>
                 <div className="grid grid-cols-3 gap-2 sm:gap-4 text-right">
                   <div>

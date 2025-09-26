@@ -102,71 +102,121 @@ export type Database = {
           },
         ]
       }
-      machines: {
+      franchises: {
         Row: {
-          coin_price: number
-          created_at: string
-          doll_price: number
-          duration: string
-          electricity_cost: number
           id: string
-          installation_date: string
-          is_active: boolean
-          location: string
-          machine_number: string | null
-          maintenance_percentage: number
-          name: string
-          clowee_profit_share_percentage: number
-          franchise_profit_share_percentage: number
-          security_deposit_type: string | null
-          security_deposit_amount: number | null
-          security_deposit_notes: string | null
-          updated_at: string
+          franchise_name: string
+          coin_price: number
+          doll_price: number
+          electricity_cost: number
           vat_percentage: number
+          franchise_profit_share_percentage: number
+          clowee_profit_share_percentage: number
+          maintenance_percentage: number
+          trade_license: string | null
+          proprietor_nid: string | null
+          payment_duration: string
+          security_deposit_type: string | null
+          security_deposit_notes: string | null
+          agreement_copy_url: string | null
+          trade_nid_attachments: Json
+          is_active: boolean
+          created_at: string
+          updated_at: string
         }
         Insert: {
-          coin_price: number
-          created_at?: string
-          doll_price: number
-          duration: string
-          electricity_cost: number
           id?: string
-          installation_date: string
-          is_active?: boolean
-          location: string
-          machine_number?: string | null
-          maintenance_percentage: number
-          name: string
-          clowee_profit_share_percentage?: number
-          franchise_profit_share_percentage?: number
+          franchise_name: string
+          coin_price: number
+          doll_price: number
+          electricity_cost: number
+          vat_percentage?: number
+          franchise_profit_share_percentage: number
+          clowee_profit_share_percentage: number
+          maintenance_percentage?: number
+          trade_license?: string | null
+          proprietor_nid?: string | null
+          payment_duration: string
           security_deposit_type?: string | null
-          security_deposit_amount?: number | null
           security_deposit_notes?: string | null
+          agreement_copy_url?: string | null
+          trade_nid_attachments?: Json
+          is_active?: boolean
+          created_at?: string
           updated_at?: string
-          vat_percentage: number
         }
         Update: {
-          coin_price?: number
-          created_at?: string
-          doll_price?: number
-          duration?: string
-          electricity_cost?: number
           id?: string
-          installation_date?: string
-          is_active?: boolean
-          location?: string
-          machine_number?: string | null
-          maintenance_percentage?: number
-          name?: string
-          clowee_profit_share_percentage?: number
-          franchise_profit_share_percentage?: number
-          security_deposit_type?: string | null
-          security_deposit_amount?: number | null
-          security_deposit_notes?: string | null
-          updated_at?: string
+          franchise_name?: string
+          coin_price?: number
+          doll_price?: number
+          electricity_cost?: number
           vat_percentage?: number
+          franchise_profit_share_percentage?: number
+          clowee_profit_share_percentage?: number
+          maintenance_percentage?: number
+          trade_license?: string | null
+          proprietor_nid?: string | null
+          payment_duration?: string
+          security_deposit_type?: string | null
+          security_deposit_notes?: string | null
+          agreement_copy_url?: string | null
+          trade_nid_attachments?: Json
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
         }
         Relationships: []
+      }
+      machines: {
+        Row: {
+          id: string
+          franchise_id: string | null
+          name: string
+          machine_number: string | null
+          machine_id_esp: string | null
+          branch_location: string | null
+          installation_date: string
+          is_active: boolean
+          notes: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          franchise_id?: string | null
+          name: string
+          machine_number?: string | null
+          machine_id_esp?: string | null
+          branch_location?: string | null
+          installation_date: string
+          is_active?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          franchise_id?: string | null
+          name?: string
+          machine_number?: string | null
+          machine_id_esp?: string | null
+          branch_location?: string | null
+          installation_date?: string
+          is_active?: boolean
+          notes?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "machines_franchise_id_fkey"
+            columns: ["franchise_id"]
+            isOneToOne: false
+            referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       machine_change_logs: {
         Row: {

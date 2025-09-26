@@ -2,6 +2,10 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { Plus, Building2, Download, Eye, FileText, Edit, Trash2 } from "lucide-react";
@@ -13,9 +17,15 @@ interface Franchise {
   coin_price: number;
   doll_price: number;
   electricity_cost: number;
+  vat_percentage?: number;
   franchise_profit_share: number;
   clowee_profit_share: number;
+  maintenance_percentage?: number;
+  trade_license?: string;
+  proprietor_nid?: string;
   payment_duration: string;
+  security_deposit_type?: string;
+  security_deposit_notes?: string;
   is_active: boolean;
   created_at: string;
   agreement_copy_url?: string;
@@ -26,6 +36,8 @@ const AllFranchises = () => {
   const navigate = useNavigate();
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [loading, setLoading] = useState(true);
+  const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null);
+  const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     fetchFranchises();
@@ -99,6 +111,42 @@ const AllFranchises = () => {
     }
   };
 
+  const handleEditFranchise = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingFranchise) return;
+    setSaving(true);
+    try {
+      const formData = new FormData(e.target as HTMLFormElement);
+      const { error } = await supabase
+        .from('franchises')
+        .update({
+          name: formData.get('name') as string,
+          coin_price: parseFloat(formData.get('coin_price') as string),
+          doll_price: parseFloat(formData.get('doll_price') as string),
+          electricity_cost: parseFloat(formData.get('electricity_cost') as string),
+          vat_percentage: parseFloat(formData.get('vat_percentage') as string) || 0,
+          franchise_profit_share: parseFloat(formData.get('franchise_profit_share') as string),
+          clowee_profit_share: parseFloat(formData.get('clowee_profit_share') as string),
+          maintenance_percentage: parseFloat(formData.get('maintenance_percentage') as string) || 0,
+          trade_license: formData.get('trade_license') as string,
+          proprietor_nid: formData.get('proprietor_nid') as string,
+          payment_duration: formData.get('payment_duration') as string,
+          security_deposit_type: formData.get('security_deposit_type') as string,
+          security_deposit_notes: formData.get('security_deposit_notes') as string,
+        })
+        .eq('id', editingFranchise.id);
+      
+      if (error) throw error;
+      toast.success('Franchise updated successfully!');
+      setEditingFranchise(null);
+      fetchFranchises();
+    } catch (error: any) {
+      toast.error(`Update failed: ${error.message}`);
+    } finally {
+      setSaving(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="container mx-auto p-6">
@@ -138,7 +186,7 @@ const AllFranchises = () => {
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => navigate(`/edit-franchise/${franchise.id}`)}
+                      onClick={() => setEditingFranchise(franchise)}
                       className="h-8 w-8 p-0"
                     >
                       <Edit className="h-4 w-4" />
@@ -259,6 +307,94 @@ const AllFranchises = () => {
           ))}
         </div>
       )}
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingFranchise} onOpenChange={(open) => !open && setEditingFranchise(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Edit Franchise</DialogTitle>
+          </DialogHeader>
+          {editingFranchise && (
+            <form onSubmit={handleEditFranchise} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Franchise Name</Label>
+                  <Input id="name" name="name" defaultValue={editingFranchise.name} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="coin_price">Coin Price (৳)</Label>
+                  <Input id="coin_price" name="coin_price" type="number" step="0.01" defaultValue={editingFranchise.coin_price} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="doll_price">Doll Price (৳)</Label>
+                  <Input id="doll_price" name="doll_price" type="number" step="0.01" defaultValue={editingFranchise.doll_price} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="electricity_cost">Electricity Cost (৳)</Label>
+                  <Input id="electricity_cost" name="electricity_cost" type="number" step="0.01" defaultValue={editingFranchise.electricity_cost} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="vat_percentage">VAT Percentage (%)</Label>
+                  <Input id="vat_percentage" name="vat_percentage" type="number" step="0.01" defaultValue={editingFranchise.vat_percentage || 0} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="franchise_profit_share">Franchise Share (%)</Label>
+                  <Input id="franchise_profit_share" name="franchise_profit_share" type="number" step="0.01" defaultValue={editingFranchise.franchise_profit_share} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="clowee_profit_share">Clowee Share (%)</Label>
+                  <Input id="clowee_profit_share" name="clowee_profit_share" type="number" step="0.01" defaultValue={editingFranchise.clowee_profit_share} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="maintenance_percentage">Maintenance (%)</Label>
+                  <Input id="maintenance_percentage" name="maintenance_percentage" type="number" step="0.01" defaultValue={editingFranchise.maintenance_percentage || 0} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="trade_license">Trade License</Label>
+                  <Input id="trade_license" name="trade_license" defaultValue={editingFranchise.trade_license || ''} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="proprietor_nid">Proprietor NID</Label>
+                  <Input id="proprietor_nid" name="proprietor_nid" defaultValue={editingFranchise.proprietor_nid || ''} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="payment_duration">Payment Duration</Label>
+                  <Select name="payment_duration" defaultValue={editingFranchise.payment_duration}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="half_month">Half Month</SelectItem>
+                      <SelectItem value="full_month">Full Month</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="security_deposit_type">Security Deposit Type</Label>
+                  <Select name="security_deposit_type" defaultValue={editingFranchise.security_deposit_type || ''}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select type" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="cheque">Cheque</SelectItem>
+                      <SelectItem value="cash">Cash</SelectItem>
+                      <SelectItem value="other">Other</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 col-span-1 md:col-span-2">
+                  <Label htmlFor="security_deposit_notes">Security Deposit Notes</Label>
+                  <Input id="security_deposit_notes" name="security_deposit_notes" defaultValue={editingFranchise.security_deposit_notes || ''} />
+                </div>
+              </div>
+              <DialogFooter>
+                <Button type="button" variant="ghost" onClick={() => setEditingFranchise(null)}>Cancel</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

@@ -32,15 +32,17 @@ import InvoiceGenerator from '@/components/invoices/InvoiceGenerator';
 interface Machine {
   id: string;
   name: string;
-  location: string;
-  coin_price: number;
-  doll_price: number;
-  electricity_cost: number;
-  vat_percentage: number;
-  clowee_profit_share_percentage: number;
-  franchise_profit_share_percentage: number;
-  maintenance_percentage: number;
-  duration: string;
+  branch_location: string;
+  franchise_id: string;
+  franchises?: {
+    coin_price: number;
+    doll_price: number;
+    electricity_cost: number;
+    vat_percentage: number;
+    clowee_profit_share_percentage: number;
+    franchise_profit_share_percentage: number;
+    maintenance_percentage: number;
+  };
 }
 
 interface CalculationResult {
@@ -73,7 +75,7 @@ interface PayToCloweeRecord {
   created_at: string;
   machines: {
     name: string;
-    location: string;
+    branch_location: string;
   };
 }
 
@@ -105,14 +107,40 @@ const PayToClowee = () => {
 
   const fetchMachines = async () => {
     try {
-      const { data, error } = await supabase
+      // First get machines
+      const { data: machinesData, error: machinesError } = await supabase
         .from('machines')
         .select('*')
         .eq('is_active', true)
         .order('name');
 
-      if (error) throw error;
-      setMachines(data || []);
+      if (machinesError) throw machinesError;
+
+      // Then get franchises data
+      const { data: franchisesData, error: franchisesError } = await supabase
+        .from('franchises')
+        .select('id, coin_price, doll_price, electricity_cost, vat_percentage, clowee_profit_share, franchise_profit_share, maintenance_percentage');
+
+      if (franchisesError) throw franchisesError;
+
+      // Merge the data
+      const machinesWithFranchises = machinesData?.map(machine => {
+        const franchise = franchisesData?.find(f => f.id === machine.franchise_id);
+        return {
+          ...machine,
+          franchises: franchise ? {
+            coin_price: franchise.coin_price,
+            doll_price: franchise.doll_price,
+            electricity_cost: franchise.electricity_cost,
+            vat_percentage: franchise.vat_percentage,
+            clowee_profit_share_percentage: franchise.clowee_profit_share,
+            franchise_profit_share_percentage: franchise.franchise_profit_share,
+            maintenance_percentage: franchise.maintenance_percentage
+          } : undefined
+        };
+      }) || [];
+
+      setMachines(machinesWithFranchises);
     } catch (error: any) {
       toast({
         title: "Error loading machines",
@@ -127,13 +155,31 @@ const PayToClowee = () => {
     
     setLoadingHistory(true);
     try {
-      const { data, error } = await supabase
+      // First get pay_to_clowee records
+      const { data: payRecords, error: payError } = await supabase
         .from('pay_to_clowee')
-        .select('*, machines(name, location)')
+        .select('*')
         .order('created_at', { ascending: false });
 
-      if (error) throw error;
-      setPayToCloweeRecords(data || []);
+      if (payError) throw payError;
+
+      // Then get machines data
+      const { data: machinesData, error: machinesError } = await supabase
+        .from('machines')
+        .select('id, name, branch_location');
+
+      if (machinesError) throw machinesError;
+
+      // Merge the data
+      const recordsWithMachines = payRecords?.map(record => {
+        const machine = machinesData?.find(m => m.id === record.machine_id);
+        return {
+          ...record,
+          machines: machine ? { name: machine.name, branch_location: machine.branch_location } : { name: 'Unknown', branch_location: 'Unknown' }
+        };
+      }) || [];
+
+      setPayToCloweeRecords(recordsWithMachines);
     } catch (error: any) {
       toast({
         title: "Error loading records",
@@ -358,7 +404,7 @@ const PayToClowee = () => {
       },
       client: {
         name: record.machines.name,
-        address: record.machines.location,
+        address: record.machines.branch_location,
       },
       invoiceNumber: `PAY-${record.id.slice(0, 8).toUpperCase()}`,
       invoiceDate: new Date(record.created_at).toISOString().split('T')[0],
@@ -448,7 +494,7 @@ const PayToClowee = () => {
                   <SelectContent>
                     {machines.map((machine) => (
                       <SelectItem key={machine.id} value={machine.id}>
-                        {machine.name} - {machine.location}
+                        {machine.name} - {machine.branch_location}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -610,7 +656,7 @@ const PayToClowee = () => {
                     <TableRow key={record.id}>
                       <TableCell>
                         <div className="font-medium">{record.machines.name}</div>
-                        <div className="text-sm text-muted-foreground">{record.machines.location}</div>
+                        <div className="text-sm text-muted-foreground">{record.machines.branch_location}</div>
                       </TableCell>
                       <TableCell>
                         <div className="text-sm">{formatDateRange(record.start_date, record.end_date)}</div>
@@ -733,7 +779,7 @@ const PayToClowee = () => {
                 </div>
                 <div>
                   <Label>Location</Label>
-                  <div className="p-2 bg-muted rounded">{viewingRecord.machines.location}</div>
+                  <div className="p-2 bg-muted rounded">{viewingRecord.machines.branch_location}</div>
                 </div>
                 <div>
                   <Label>Period</Label>
@@ -801,7 +847,7 @@ const PayToClowee = () => {
                 }}
                 client={{
                   name: viewingInvoice.machines.name,
-                  address: viewingInvoice.machines.location,
+                  address: viewingInvoice.machines.branch_location,
                 }}
                 invoiceNumber={`PAY-${viewingInvoice.id.slice(0, 8).toUpperCase()}`}
                 invoiceDate={new Date(viewingInvoice.created_at).toISOString().split('T')[0]}

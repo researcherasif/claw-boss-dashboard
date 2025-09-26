@@ -18,9 +18,8 @@ import { TablePagination } from '@/components/TablePagination';
 interface Machine {
   id: string;
   name: string;
-  location: string;
-  coin_price?: number;
-  doll_price?: number;
+  branch_location: string;
+  franchise_id: string;
 }
 
 interface MachineReport {
@@ -65,7 +64,16 @@ const MachineReport = () => {
     try {
       const { data, error } = await supabase
         .from('machines')
-        .select('id, name, location, coin_price, doll_price')
+        .select(`
+          id, 
+          name, 
+          branch_location, 
+          franchise_id,
+          franchises!inner(
+            coin_price,
+            doll_price
+          )
+        `)
         .eq('is_active', true)
         .order('name');
 
@@ -84,17 +92,32 @@ const MachineReport = () => {
 
   const fetchReports = async () => {
     try {
-      const { data, error } = await supabase
+      // First get reports
+      const { data: reportsData, error: reportsError } = await supabase
         .from('machine_counter_reports')
-        .select(`
-          *,
-          machines!inner(name, location)
-        `)
+        .select('*')
         .order('report_date', { ascending: false })
         .limit(50);
 
-      if (error) throw error;
-      setReports(data || []);
+      if (reportsError) throw reportsError;
+
+      // Then get machines data and merge
+      const { data: machinesData, error: machinesError } = await supabase
+        .from('machines')
+        .select('id, name, branch_location');
+
+      if (machinesError) throw machinesError;
+
+      // Merge the data
+      const reportsWithMachines = reportsData?.map(report => {
+        const machine = machinesData?.find(m => m.id === report.machine_id);
+        return {
+          ...report,
+          machines: machine ? { name: machine.name, branch_location: machine.branch_location } : { name: 'Unknown', branch_location: 'Unknown' }
+        };
+      }) || [];
+
+      setReports(reportsWithMachines);
     } catch (error: any) {
       toast({
         title: "Error loading reports",
@@ -309,7 +332,7 @@ const MachineReport = () => {
                   <SelectContent>
                     {machines.map((machine) => (
                       <SelectItem key={machine.id} value={machine.id}>
-                        {machine.name} - {machine.location}
+                        {machine.name} - {machine.branch_location}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -419,7 +442,7 @@ const MachineReport = () => {
                     <TableCell>{formatDate(report.report_date)}</TableCell>
                     <TableCell>
                       <div className="font-medium text-sm">{report.machines.name}</div>
-                      <div className="text-xs text-muted-foreground">{report.machines.location}</div>
+                      <div className="text-xs text-muted-foreground">{report.machines.branch_location}</div>
                     </TableCell>
                     <TableCell>{report.coin_count}</TableCell>
                     <TableCell>{report.prize_count}</TableCell>
@@ -470,7 +493,7 @@ const MachineReport = () => {
             <form onSubmit={handleEditReport} className="space-y-4">
               <div className="space-y-2">
                 <Label>Machine</Label>
-                <Input value={`${editingReport.machines.name} - ${editingReport.machines.location}`} disabled />
+                <Input value={`${editingReport.machines.name} - ${editingReport.machines.branch_location}`} disabled />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="report_date">Date</Label>
@@ -527,7 +550,7 @@ const CalculationDisplay = ({
   prevPrizeCount: number | null;
 }) => {
   const machine = machines.find(m => m.id === selectedMachine);
-  const coinPrice = machine?.coin_price ?? 0;
+  const coinPrice = machine?.franchises?.coin_price ?? 0;
   const todayCoins = typeof todayCoinCount === 'number' ? todayCoinCount : 0;
   const todayPrizes = typeof todayPrizeCount === 'number' ? todayPrizeCount : 0;
   const sellCoins = prevCoinCount != null ? Math.max(0, todayCoins - prevCoinCount) : 0;

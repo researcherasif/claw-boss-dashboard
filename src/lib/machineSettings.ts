@@ -43,15 +43,36 @@ export async function getMachineSettingsForDate(machineId: string, date: string)
     if (data) {
       settings[field] = field === 'duration' ? data.field_value : parseFloat(data.field_value);
     } else {
-      // Fallback to machine's current value
+      // Fallback to franchise's current value
       const { data: machine, error: machineError } = await supabase
         .from('machines')
-        .select(field)
+        .select('franchise_id')
         .eq('id', machineId)
         .single();
       
       if (machineError) throw machineError;
-      settings[field] = machine[field];
+      
+      const { data: franchise, error: franchiseError } = await supabase
+        .from('franchises')
+        .select('*')
+        .eq('id', machine.franchise_id)
+        .single();
+      
+      if (franchiseError) throw franchiseError;
+      
+      // Map field names to franchise fields
+      const fieldMapping: any = {
+        'coin_price': franchise.coin_price,
+        'doll_price': franchise.doll_price,
+        'electricity_cost': franchise.electricity_cost,
+        'vat_percentage': franchise.vat_percentage,
+        'maintenance_percentage': franchise.maintenance_percentage,
+        'clowee_profit_share_percentage': franchise.clowee_profit_share,
+        'franchise_profit_share_percentage': franchise.franchise_profit_share,
+        'duration': franchise.payment_duration
+      };
+      
+      settings[field] = fieldMapping[field] || 0;
     }
   }
 

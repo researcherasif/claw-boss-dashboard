@@ -69,11 +69,6 @@ const Layout = () => {
 
   const machineItems = [
     {
-      title: "Add Machine",
-      icon: Plus,
-      href: "/add-machine",
-    },
-    {
       title: "All Machines",
       icon: FileText,
       href: "/all-machines",
