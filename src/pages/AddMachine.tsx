@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
 
 const AddMachine = () => {
@@ -15,6 +16,7 @@ const AddMachine = () => {
   const [franchiseShare, setFranchiseShare] = useState(0);
   const [cloweeShare, setCloweeShare] = useState(0);
   const { toast } = useToast();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleFranchiseShareChange = (value: number) => {
@@ -67,9 +69,21 @@ const AddMachine = () => {
         clowee_profit_share_percentage: parseFloat(formData.get('clowee_profit_share_percentage') as string),
       };
 
-      const { error } = await supabase.from('machines').insert([machineData]);
+      const { data: machine, error } = await supabase.from('machines').insert([machineData]).select().single();
 
       if (error) throw error;
+
+      // Create initial counter report
+      const { error: reportError } = await supabase.from('machine_counter_reports').insert([{
+        machine_id: machine.id,
+        report_date: machineData.installation_date,
+        coin_count: parseInt(formData.get('initial_coin_count') as string) || 0,
+        prize_count: parseInt(formData.get('initial_prize_count') as string) || 0,
+        notes: `Initial setup at ${machineData.location} - Day 1 counter reading`,
+        created_by: user.id,
+      }]);
+
+      if (reportError) throw reportError;
 
       toast({
         title: "Machine added successfully",
@@ -258,6 +272,32 @@ const AddMachine = () => {
                   id="installation_date"
                   name="installation_date"
                   type="date"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="initial_coin_count">Initial Coin Count</Label>
+                <Input
+                  id="initial_coin_count"
+                  name="initial_coin_count"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  defaultValue="0"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="initial_prize_count">Initial Prize Count</Label>
+                <Input
+                  id="initial_prize_count"
+                  name="initial_prize_count"
+                  type="number"
+                  min="0"
+                  placeholder="0"
+                  defaultValue="0"
                   required
                 />
               </div>

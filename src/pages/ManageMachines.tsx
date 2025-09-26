@@ -23,7 +23,8 @@ interface Machine {
   doll_price: number;
   electricity_cost: number;
   vat_percentage: number;
-  profit_share_percentage: number;
+  clowee_profit_share_percentage: number;
+  franchise_profit_share_percentage: number;
   maintenance_percentage: number;
   duration: string;
   installation_date: string;
@@ -46,7 +47,8 @@ const ManageMachines = () => {
     electricity_cost: 'Electricity Cost',
     vat_percentage: 'VAT %',
     maintenance_percentage: 'Maintenance %',
-    profit_share_percentage: 'Profit Share %',
+    clowee_profit_share_percentage: 'Clowee Profit Share %',
+    franchise_profit_share_percentage: 'Franchise Profit Share %',
     duration: 'Duration'
   };
 

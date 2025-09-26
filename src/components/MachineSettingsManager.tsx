@@ -25,7 +25,8 @@ const fieldLabels = {
   electricity_cost: 'Electricity Cost (BDT)',
   vat_percentage: 'VAT Percentage (%)',
   maintenance_percentage: 'Maintenance Percentage (%)',
-  profit_share_percentage: 'Profit Share Percentage (%)',
+  clowee_profit_share_percentage: 'Clowee Profit Share Percentage (%)',
+  franchise_profit_share_percentage: 'Franchise Profit Share Percentage (%)',
   duration: 'Duration'
 };
 

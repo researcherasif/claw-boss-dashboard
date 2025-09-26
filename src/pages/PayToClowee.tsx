@@ -9,7 +9,22 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { Calculator, Loader2, FileText, History, Trash2, Printer, Download } from 'lucide-react';
+import { Calculator, Loader2, FileText, History, Trash2, Printer, Download, Pencil, Eye } from 'lucide-react';
+
+const formatDateRange = (startDate: string, endDate: string) => {
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    const day = date.getDate();
+    const month = date.toLocaleDateString('en-US', { month: 'short' });
+    const year = date.getFullYear();
+    const suffix = day === 1 || day === 21 || day === 31 ? 'st' : 
+                   day === 2 || day === 22 ? 'nd' : 
+                   day === 3 || day === 23 ? 'rd' : 'th';
+    return `${day}${suffix} ${month} ${year}`;
+  };
+  return `${formatDate(startDate)} - ${formatDate(endDate)}`;
+};
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { formatCurrencyBDT } from '@/lib/currency';
 import { getMachineSettingsForDate } from '@/lib/machineSettings';
 import InvoiceGenerator from '@/components/invoices/InvoiceGenerator';
@@ -22,7 +37,8 @@ interface Machine {
   doll_price: number;
   electricity_cost: number;
   vat_percentage: number;
-  profit_share_percentage: number;
+  clowee_profit_share_percentage: number;
+  franchise_profit_share_percentage: number;
   maintenance_percentage: number;
   duration: string;
 }
@@ -40,12 +56,9 @@ interface CalculationResult {
   payToClowee: number;
 }
 
-interface PaymentCalculation {
+interface PayToCloweeRecord {
   id: string;
-  entry_date: string;
-  entry_time: string;
   machine_id: string;
-  machine_name: string;
   start_date: string;
   end_date: string;
   total_coins: number;
@@ -56,15 +69,24 @@ interface PaymentCalculation {
   vat_amount: number;
   maintenance_cost: number;
   profit_share_amount: number;
-  pay_to_clowee: number;
+  net_payable: number;
   created_at: string;
+  machines: {
+    name: string;
+    location: string;
+  };
 }
 
 const PayToClowee = () => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
-  const [paymentCalculations, setPaymentCalculations] = useState<PaymentCalculation[]>([]);
+  const [payToCloweeRecords, setPayToCloweeRecords] = useState<PayToCloweeRecord[]>([]);
+  const [editingRecord, setEditingRecord] = useState<PayToCloweeRecord | null>(null);
+  const [viewingRecord, setViewingRecord] = useState<PayToCloweeRecord | null>(null);
+  const [viewingInvoice, setViewingInvoice] = useState<PayToCloweeRecord | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -77,7 +99,7 @@ const PayToClowee = () => {
 
   useEffect(() => {
     if (user) {
-      fetchPaymentCalculations();
+      fetchPayToCloweeRecords();
     }
   }, [user]);
 
@@ -100,22 +122,21 @@ const PayToClowee = () => {
     }
   };
 
-  const fetchPaymentCalculations = async () => {
+  const fetchPayToCloweeRecords = async () => {
     if (!user) return;
     
     setLoadingHistory(true);
     try {
       const { data, error } = await supabase
-        .from('payment_calculations')
-        .select('*')
-        .eq('created_by', user.id)
+        .from('pay_to_clowee')
+        .select('*, machines(name, location)')
         .order('created_at', { ascending: false });
 
       if (error) throw error;
-      setPaymentCalculations(data || []);
+      setPayToCloweeRecords(data || []);
     } catch (error: any) {
       toast({
-        title: "Error loading calculation history",
+        title: "Error loading records",
         description: error.message,
         variant: "destructive",
       });
@@ -158,25 +179,25 @@ const PayToClowee = () => {
         return;
       }
 
-      // Get the last entry before the start date
-      const { data: lastBeforeStart, error: beforeError } = await supabase
+      // Get the initial setup entry (first entry for this machine)
+      const { data: initialEntry, error: initialError } = await supabase
         .from('machine_counter_reports')
         .select('coin_count, prize_count')
         .eq('machine_id', selectedMachine.id)
-        .lt('report_date', startDate)
-        .order('report_date', { ascending: false })
+        .order('report_date', { ascending: true })
         .limit(1)
         .maybeSingle();
-      if (beforeError) throw beforeError;
+      
+      if (initialError) throw initialError;
 
-      // Calculate totals: Last entry in range - Last entry before start
-      const lastInRangeCoins = lastInRange.coin_count || 0;
-      const lastInRangePrizes = lastInRange.prize_count || 0;
-      const lastBeforeCoins = lastBeforeStart?.coin_count || 0;
-      const lastBeforePrizes = lastBeforeStart?.prize_count || 0;
+      // Calculate totals: Current reading - Initial setup reading
+      const currentCoins = lastInRange.coin_count || 0;
+      const currentPrizes = lastInRange.prize_count || 0;
+      const initialCoins = initialEntry?.coin_count || 0;
+      const initialPrizes = initialEntry?.prize_count || 0;
 
-      const totalCoins = Math.max(0, lastInRangeCoins - lastBeforeCoins);
-      const totalPrizes = Math.max(0, lastInRangePrizes - lastBeforePrizes);
+      const totalCoins = Math.max(0, currentCoins - initialCoins);
+      const totalPrizes = Math.max(0, currentPrizes - initialPrizes);
 
       // Get machine settings for the end date (most recent settings in the period)
       const settings = await getMachineSettingsForDate(selectedMachine.id, endDate);
@@ -190,7 +211,7 @@ const PayToClowee = () => {
       // Profit base = Total Income − (Prize Cost + VAT + Maintenance)
       const profitBase = totalIncome - (prizeCost + vatAmount + maintenanceCost);
       // Clowee share percent from dynamic settings
-      const cloweePercent = settings.profit_share_percentage;
+      const cloweePercent = settings.clowee_profit_share_percentage || 0;
       const profitShareAmount = profitBase * (cloweePercent / 100);
 
       // Total Amount after deductions (full electricity here)
@@ -233,18 +254,10 @@ const PayToClowee = () => {
       const startDate = formData.get('start_date') as string;
       const endDate = formData.get('end_date') as string;
 
-      // Get current date and time
-      const now = new Date();
-      const entryDate = now.toISOString().split('T')[0]; // YYYY-MM-DD format
-      const entryTime = now.toTimeString().split(' ')[0].substring(0, 5); // HH:MM format
-
       const { error } = await supabase
-        .from('payment_calculations')
+        .from('pay_to_clowee')
         .insert([{
-          entry_date: entryDate,
-          entry_time: entryTime,
           machine_id: selectedMachine.id,
-          machine_name: selectedMachine.name,
           start_date: startDate,
           end_date: endDate,
           total_coins: calculationResult.totalCoins,
@@ -255,25 +268,23 @@ const PayToClowee = () => {
           vat_amount: calculationResult.vatAmount,
           maintenance_cost: calculationResult.maintenanceCost,
           profit_share_amount: calculationResult.profitShareAmount,
-          pay_to_clowee: calculationResult.payToClowee,
+          net_payable: calculationResult.payToClowee,
           created_by: user.id,
         }]);
 
       if (error) throw error;
 
       toast({
-        title: "Calculation saved successfully",
-        description: "The payment calculation has been saved to records.",
+        title: "Payment record saved",
+        description: "The payment calculation has been saved.",
       });
 
-      // Refresh the calculation history
-      await fetchPaymentCalculations();
-
-      // Keep the current calculation visible and show invoice actions below
+      await fetchPayToCloweeRecords();
+      setCalculationResult(null);
 
     } catch (error: any) {
       toast({
-        title: "Error saving calculation",
+        title: "Error saving record",
         description: error.message,
         variant: "destructive",
       });
@@ -282,29 +293,121 @@ const PayToClowee = () => {
     }
   };
 
-  const handleDeleteCalculation = async (id: string) => {
+  const handleDeleteRecord = async (id: string) => {
+    if (!confirm('Delete this payment record?')) return;
     try {
       const { error } = await supabase
-        .from('payment_calculations')
+        .from('pay_to_clowee')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
 
       toast({
-        title: "Calculation deleted",
-        description: "The payment calculation has been removed.",
+        title: "Record deleted",
+        description: "The payment record has been removed.",
       });
 
-      // Refresh the calculation history
-      await fetchPaymentCalculations();
+      await fetchPayToCloweeRecords();
     } catch (error: any) {
       toast({
-        title: "Error deleting calculation",
+        title: "Error deleting record",
         description: error.message,
         variant: "destructive",
       });
     }
+  };
+
+  const handleUpdateRecord = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingRecord) return;
+    setSaving(true);
+    try {
+      const formData = new FormData(e.target as HTMLFormElement);
+      const { error } = await supabase
+        .from('pay_to_clowee')
+        .update({
+          start_date: formData.get('start_date') as string,
+          end_date: formData.get('end_date') as string,
+          total_coins: parseInt(formData.get('total_coins') as string),
+          total_prizes: parseInt(formData.get('total_prizes') as string),
+          net_payable: parseFloat(formData.get('net_payable') as string),
+        })
+        .eq('id', editingRecord.id);
+      
+      if (error) throw error;
+      toast({ title: 'Record updated' });
+      setEditingRecord(null);
+      await fetchPayToCloweeRecords();
+    } catch (error: any) {
+      toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleDownloadPDF = (record: PayToCloweeRecord) => {
+    const invoiceData = {
+      company: {
+        name: 'i3 Technologies',
+        address: 'House #29, Flat #C2, 29, Katasur, Mohammadpur, Dhaka-1207',
+        mobile: '+8801325-886868',
+        email: 'support@i3technologies.com.bd',
+        website: 'www.sohub.com.bd/clowee',
+        logoUrl: '/i3-logo.png',
+      },
+      client: {
+        name: record.machines.name,
+        address: record.machines.location,
+      },
+      invoiceNumber: `PAY-${record.id.slice(0, 8).toUpperCase()}`,
+      invoiceDate: new Date(record.created_at).toISOString().split('T')[0],
+      items: [{
+        serial: 1,
+        description: 'Pay to Clowee - Machine Settlement',
+        period: formatDateRange(record.start_date, record.end_date),
+        total: record.net_payable,
+      }],
+      banks: [{
+        bankName: 'Midland Bank Limited',
+        branch: 'Gulshan',
+        accountName: 'i3 Technologies',
+        accountNumber: '0011-1050008790',
+      }],
+      footerNotes: [
+        'Payment due upon receipt.',
+        'Please send deposit slip/screenshot after payment.',
+      ],
+      rightLogoUrl: '/clowee-logo.png'
+    };
+
+    // Create a temporary div to render the invoice
+    const tempDiv = document.createElement('div');
+    tempDiv.style.position = 'absolute';
+    tempDiv.style.left = '-9999px';
+    document.body.appendChild(tempDiv);
+
+    // Import and render InvoiceGenerator
+    import('@/components/invoices/InvoiceGenerator').then(({ default: InvoiceGenerator }) => {
+      const React = require('react');
+      const ReactDOM = require('react-dom/client');
+      
+      const root = ReactDOM.createRoot(tempDiv);
+      root.render(React.createElement(InvoiceGenerator, invoiceData));
+      
+      // Wait for render then trigger download
+      setTimeout(() => {
+        const invoiceElement = tempDiv.querySelector('.invoice-container');
+        if (invoiceElement) {
+          // Trigger the download from InvoiceGenerator
+          const downloadBtn = invoiceElement.querySelector('[data-download-pdf]') as HTMLButtonElement;
+          if (downloadBtn) {
+            downloadBtn.click();
+          }
+        }
+        document.body.removeChild(tempDiv);
+      }, 100);
+    });
   };
 
   return (
@@ -406,11 +509,11 @@ const PayToClowee = () => {
             <CardContent className="space-y-4">
               <div className="grid gap-4 text-sm">
                 <div className="grid grid-cols-2">
-                  <div className="font-medium">Today Coin</div>
+                  <div className="font-medium">Sell Coin (Total - Initial)</div>
                   <div className="text-right">{calculationResult.totalCoins}</div>
                   </div>
                 <div className="grid grid-cols-2">
-                  <div className="font-medium">Today Prize</div>
+                  <div className="font-medium">Prize Given (Total - Initial)</div>
                   <div className="text-right">{calculationResult.totalPrizes}</div>
                   </div>
                 <div className="grid grid-cols-2">
@@ -463,131 +566,276 @@ const PayToClowee = () => {
         )}
       </div>
 
-      {/* Inline Invoice Actions when a calculation exists */}
-      {calculationResult && selectedMachine && (
-        <Card className="mt-6">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Invoice
-            </CardTitle>
-            <CardDescription>
-              Preview and generate invoice for {selectedMachine.name}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <InvoiceGenerator
-              company={{
-                name: 'i3 Technologies',
-                address: 'House #29, Flat #C2, 29, Katasur, Mohammadpur, Dhaka-1207',
-                mobile: '+8801325-886868',
-                email: 'support@i3technologies.com.bd',
-                website: 'www.sohub.com.bd/clowee',
-                logoUrl: '/i3-logo.png',
-              }}
-              client={{
-                name: selectedMachine.name,
-                address: selectedMachine.location,
-              }}
-              invoiceNumber={`INV-${new Date().toISOString().slice(0,10).replace(/-/g,'')}-${selectedMachine.id.slice(0,5)}`}
-              invoiceDate={new Date().toISOString().split('T')[0]}
-              items={[{
-                serial: 1,
-                description: 'Pay to Clowee - Machine Settlement',
-                period: (() => {
-                  const form = document.querySelector('form') as HTMLFormElement | null;
-                  const s = form ? (form.querySelector('#start_date') as HTMLInputElement)?.value : '';
-                  const e = form ? (form.querySelector('#end_date') as HTMLInputElement)?.value : '';
-                  return s && e ? `${s} to ${e}` : '';
-                })(),
-                total: calculationResult.payToClowee,
-              }]}
-              banks={[{
-                bankName: 'Midland Bank Limited',
-                branch: 'Gulshan',
-                accountName: 'i3 Technologies',
-                accountNumber: '0011-1050008790',
-              }]}
-              footerNotes={[
-                'Payment due upon receipt.',
-                'Please send deposit slip/screenshot after payment.',
-              ]}
-              rightLogoUrl={'/clowee-logo.png'}
-            />
-          </CardContent>
-        </Card>
-      )}
 
-      {/* Payment Calculation History */}
+
+      {/* Pay to Clowee Records */}
       <Card className="mt-8">
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <History className="h-5 w-5" />
-            Payment Calculation History
+            Pay to Clowee Records
           </CardTitle>
           <CardDescription>
-            View and manage your saved payment calculations
+            View and manage saved payment records
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loadingHistory ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Loading history...</span>
+              <span className="ml-2">Loading records...</span>
             </div>
-          ) : paymentCalculations.length === 0 ? (
+          ) : payToCloweeRecords.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              No payment calculations found. Create your first calculation above.
+              No payment records found. Create your first calculation above.
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Entry Date</TableHead>
-                    <TableHead>Entry Time</TableHead>
                     <TableHead>Machine</TableHead>
-                    <TableHead>Machine ID</TableHead>
-                    <TableHead>Start Date</TableHead>
-                    <TableHead>End Date</TableHead>
-                    <TableHead>Total Coins</TableHead>
-                    <TableHead>Total Prizes</TableHead>
-                    <TableHead>Pay To Clowee</TableHead>
+                    <TableHead>Period</TableHead>
+                    <TableHead>Coins</TableHead>
+                    <TableHead>Prizes</TableHead>
+                    <TableHead>Net Payable</TableHead>
+                    <TableHead>Created</TableHead>
                     <TableHead>Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {paymentCalculations.map((calculation) => (
-                    <TableRow key={calculation.id}>
-                      <TableCell>{calculation.entry_date}</TableCell>
-                      <TableCell>{calculation.entry_time}</TableCell>
-                      <TableCell className="font-medium">{calculation.machine_name}</TableCell>
-                      <TableCell className="font-mono text-xs">{calculation.machine_id.slice(0, 8)}...</TableCell>
-                      <TableCell>{calculation.start_date}</TableCell>
-                      <TableCell>{calculation.end_date}</TableCell>
-                      <TableCell className="text-center font-medium">{calculation.total_coins.toLocaleString()}</TableCell>
-                      <TableCell className="text-center font-medium">{calculation.total_prizes.toLocaleString()}</TableCell>
-                      <TableCell className={calculation.pay_to_clowee >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
-                        {formatCurrencyBDT(calculation.pay_to_clowee)}
+                  {payToCloweeRecords
+                    .slice((currentPage - 1) * pageSize, currentPage * pageSize)
+                    .map((record) => (
+                    <TableRow key={record.id}>
+                      <TableCell>
+                        <div className="font-medium">{record.machines.name}</div>
+                        <div className="text-sm text-muted-foreground">{record.machines.location}</div>
                       </TableCell>
                       <TableCell>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => handleDeleteCalculation(calculation.id)}
-                          className="text-red-600 hover:text-red-700"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                        <div className="text-sm">{formatDateRange(record.start_date, record.end_date)}</div>
+                      </TableCell>
+                      <TableCell className="text-center">{record.total_coins.toLocaleString()}</TableCell>
+                      <TableCell className="text-center">{record.total_prizes.toLocaleString()}</TableCell>
+                      <TableCell className={record.net_payable >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+                        {formatCurrencyBDT(record.net_payable)}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground">
+                        {new Date(record.created_at).toLocaleDateString()}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button size="sm" variant="outline" onClick={() => setViewingRecord(record)}>
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="outline" onClick={() => setEditingRecord(record)}>
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => setViewingInvoice(record)}>
+                            <FileText className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="secondary" onClick={() => handleDownloadPDF(record)}>
+                            <Download className="h-4 w-4" />
+                          </Button>
+                          <Button size="sm" variant="destructive" onClick={() => handleDeleteRecord(record.id)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
               </Table>
+              {payToCloweeRecords.length > pageSize && (
+                <div className="flex justify-between items-center mt-4">
+                  <div className="text-sm text-muted-foreground">
+                    Showing {((currentPage - 1) * pageSize) + 1} to {Math.min(currentPage * pageSize, payToCloweeRecords.length)} of {payToCloweeRecords.length} records
+                  </div>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                      disabled={currentPage === 1}
+                    >
+                      Previous
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      onClick={() => setCurrentPage(p => Math.min(Math.ceil(payToCloweeRecords.length / pageSize), p + 1))}
+                      disabled={currentPage >= Math.ceil(payToCloweeRecords.length / pageSize)}
+                    >
+                      Next
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={!!editingRecord} onOpenChange={(open) => !open && setEditingRecord(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Edit Payment Record</DialogTitle>
+          </DialogHeader>
+          {editingRecord && (
+            <form onSubmit={handleUpdateRecord} className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Start Date</Label>
+                  <Input name="start_date" type="date" defaultValue={editingRecord.start_date} required />
+                </div>
+                <div>
+                  <Label>End Date</Label>
+                  <Input name="end_date" type="date" defaultValue={editingRecord.end_date} required />
+                </div>
+                <div>
+                  <Label>Total Coins</Label>
+                  <Input name="total_coins" type="number" defaultValue={editingRecord.total_coins} required />
+                </div>
+                <div>
+                  <Label>Total Prizes</Label>
+                  <Input name="total_prizes" type="number" defaultValue={editingRecord.total_prizes} required />
+                </div>
+                <div className="col-span-2">
+                  <Label>Net Payable</Label>
+                  <Input name="net_payable" type="number" step="0.01" defaultValue={editingRecord.net_payable} required />
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button type="submit" disabled={saving}>
+                  {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+                </Button>
+                <Button type="button" variant="outline" onClick={() => setEditingRecord(null)}>Cancel</Button>
+              </div>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* View Dialog */}
+      <Dialog open={!!viewingRecord} onOpenChange={(open) => !open && setViewingRecord(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Payment Record Details</DialogTitle>
+          </DialogHeader>
+          {viewingRecord && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Machine</Label>
+                  <div className="p-2 bg-muted rounded">{viewingRecord.machines.name}</div>
+                </div>
+                <div>
+                  <Label>Location</Label>
+                  <div className="p-2 bg-muted rounded">{viewingRecord.machines.location}</div>
+                </div>
+                <div>
+                  <Label>Period</Label>
+                  <div className="p-2 bg-muted rounded">{formatDateRange(viewingRecord.start_date, viewingRecord.end_date)}</div>
+                </div>
+                <div>
+                  <Label>Total Income</Label>
+                  <div className="p-2 bg-muted rounded">{formatCurrencyBDT(viewingRecord.total_income)}</div>
+                </div>
+                <div>
+                  <Label>Prize Cost</Label>
+                  <div className="p-2 bg-muted rounded">{formatCurrencyBDT(viewingRecord.prize_cost)}</div>
+                </div>
+                <div>
+                  <Label>Electricity Cost</Label>
+                  <div className="p-2 bg-muted rounded">{formatCurrencyBDT(viewingRecord.electricity_cost)}</div>
+                </div>
+                <div>
+                  <Label>VAT Amount</Label>
+                  <div className="p-2 bg-muted rounded">{formatCurrencyBDT(viewingRecord.vat_amount)}</div>
+                </div>
+                <div>
+                  <Label>Maintenance Cost</Label>
+                  <div className="p-2 bg-muted rounded">{formatCurrencyBDT(viewingRecord.maintenance_cost)}</div>
+                </div>
+                <div>
+                  <Label>Profit Share</Label>
+                  <div className="p-2 bg-muted rounded">{formatCurrencyBDT(viewingRecord.profit_share_amount)}</div>
+                </div>
+                <div>
+                  <Label className="font-bold">Net Payable</Label>
+                  <div className={`p-2 rounded font-bold ${viewingRecord.net_payable >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                    {formatCurrencyBDT(viewingRecord.net_payable)}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={() => handleDownloadPDF(viewingRecord)} variant="outline" className="flex-1">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </Button>
+                <Button onClick={() => setViewingRecord(null)} className="flex-1">Close</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Invoice View Dialog */}
+      <Dialog open={!!viewingInvoice} onOpenChange={(open) => !open && setViewingInvoice(null)}>
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Invoice Preview</DialogTitle>
+          </DialogHeader>
+          {viewingInvoice && (
+            <div>
+              <InvoiceGenerator
+                company={{
+                  name: 'i3 Technologies',
+                  address: 'House #29, Flat #C2, 29, Katasur, Mohammadpur, Dhaka-1207',
+                  mobile: '+8801325-886868',
+                  email: 'support@i3technologies.com.bd',
+                  website: 'www.sohub.com.bd/clowee',
+                  logoUrl: '/i3-logo.png',
+                }}
+                client={{
+                  name: viewingInvoice.machines.name,
+                  address: viewingInvoice.machines.location,
+                }}
+                invoiceNumber={`PAY-${viewingInvoice.id.slice(0, 8).toUpperCase()}`}
+                invoiceDate={new Date(viewingInvoice.created_at).toISOString().split('T')[0]}
+                items={[{
+                  serial: 1,
+                  description: 'Pay to Clowee - Machine Settlement',
+                  period: formatDateRange(viewingInvoice.start_date, viewingInvoice.end_date),
+                  total: viewingInvoice.net_payable,
+                }]}
+                banks={[{
+                  bankName: 'Midland Bank Limited',
+                  branch: 'Gulshan',
+                  accountName: 'i3 Technologies',
+                  accountNumber: '0011-1050008790',
+                }]}
+                footerNotes={[
+                  'Payment due upon receipt.',
+                  'Please send deposit slip/screenshot after payment.',
+                ]}
+                rightLogoUrl={'/clowee-logo.png'}
+              />
+              <div className="flex gap-2 mt-4">
+                <Button onClick={() => handleDownloadPDF(viewingInvoice)} className="flex-1">
+                  <Download className="mr-2 h-4 w-4" />
+                  Download PDF
+                </Button>
+                <Button variant="outline" onClick={() => setViewingInvoice(null)} className="flex-1">
+                  Close
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

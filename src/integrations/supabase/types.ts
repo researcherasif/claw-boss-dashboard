@@ -58,13 +58,14 @@ export type Database = {
           },
         ]
       }
-      machine_reports: {
+      machine_counter_reports: {
         Row: {
           coin_count: number
           created_at: string
           created_by: string
           id: string
           machine_id: string
+          notes: string | null
           prize_count: number
           report_date: string
           updated_at: string
@@ -75,6 +76,7 @@ export type Database = {
           created_by: string
           id?: string
           machine_id: string
+          notes?: string | null
           prize_count?: number
           report_date: string
           updated_at?: string
@@ -85,13 +87,14 @@ export type Database = {
           created_by?: string
           id?: string
           machine_id?: string
+          notes?: string | null
           prize_count?: number
           report_date?: string
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "machine_reports_machine_id_fkey"
+            foreignKeyName: "machine_counter_reports_machine_id_fkey"
             columns: ["machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
@@ -110,10 +113,9 @@ export type Database = {
           installation_date: string
           is_active: boolean
           location: string
+          machine_number: string | null
           maintenance_percentage: number
           name: string
-          profit_share_percentage: number
-          owner_profit_share_percentage: number
           clowee_profit_share_percentage: number
           franchise_profit_share_percentage: number
           security_deposit_type: string | null
@@ -132,10 +134,9 @@ export type Database = {
           installation_date: string
           is_active?: boolean
           location: string
+          machine_number?: string | null
           maintenance_percentage: number
           name: string
-          profit_share_percentage?: number
-          owner_profit_share_percentage?: number
           clowee_profit_share_percentage?: number
           franchise_profit_share_percentage?: number
           security_deposit_type?: string | null
@@ -154,10 +155,9 @@ export type Database = {
           installation_date?: string
           is_active?: boolean
           location?: string
+          machine_number?: string | null
           maintenance_percentage?: number
           name?: string
-          profit_share_percentage?: number
-          owner_profit_share_percentage?: number
           clowee_profit_share_percentage?: number
           franchise_profit_share_percentage?: number
           security_deposit_type?: string | null
@@ -297,7 +297,6 @@ export type Database = {
           net_payable: number
           prize_cost: number
           profit_share_amount: number
-          owner_profit_share_amount: number
           clowee_profit_share_amount: number
           start_date: string
           total_coins: number
@@ -317,7 +316,6 @@ export type Database = {
           net_payable?: number
           prize_cost?: number
           profit_share_amount?: number
-          owner_profit_share_amount?: number
           clowee_profit_share_amount?: number
           start_date: string
           total_coins?: number
@@ -337,7 +335,6 @@ export type Database = {
           net_payable?: number
           prize_cost?: number
           profit_share_amount?: number
-          owner_profit_share_amount?: number
           clowee_profit_share_amount?: number
           start_date?: string
           total_coins?: number

@@ -78,7 +78,7 @@ const Dashboard = () => {
         const prizeCost = totalPrizes * machine.doll_price;
         const vatAmount = totalIncome * (machine.vat_percentage / 100);
         const maintenanceCost = totalIncome * (machine.maintenance_percentage / 100);
-        const profitShareAmount = totalIncome * (machine.profit_share_percentage / 100);
+        const profitShareAmount = totalIncome * ((machine.clowee_profit_share_percentage || 0) / 100);
         
         const totalPayable = totalIncome - (prizeCost + machine.electricity_cost + vatAmount + maintenanceCost + profitShareAmount);
         const totalProfit = totalPayable; // Simplified profit calculation

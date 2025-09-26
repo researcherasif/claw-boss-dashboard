@@ -15,7 +15,8 @@ export interface MachineSettings {
   electricity_cost: number;
   vat_percentage: number;
   maintenance_percentage: number;
-  profit_share_percentage: number;
+  clowee_profit_share_percentage: number;
+  franchise_profit_share_percentage: number;
   duration: string;
 }
 
@@ -23,7 +24,7 @@ export interface MachineSettings {
  * Get machine settings for a specific date
  */
 export async function getMachineSettingsForDate(machineId: string, date: string): Promise<MachineSettings> {
-  const fields = ['coin_price', 'doll_price', 'electricity_cost', 'vat_percentage', 'maintenance_percentage', 'profit_share_percentage', 'duration'];
+  const fields = ['coin_price', 'doll_price', 'electricity_cost', 'vat_percentage', 'maintenance_percentage', 'clowee_profit_share_percentage', 'franchise_profit_share_percentage', 'duration'];
   const settings: any = {};
 
   for (const field of fields) {

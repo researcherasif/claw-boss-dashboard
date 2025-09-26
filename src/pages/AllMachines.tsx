@@ -24,8 +24,6 @@ interface Machine {
   doll_price: number;
   electricity_cost: number;
   vat_percentage: number;
-  profit_share_percentage?: number;
-  owner_profit_share_percentage?: number;
   clowee_profit_share_percentage?: number;
   franchise_profit_share_percentage?: number;
   maintenance_percentage: number;
@@ -34,6 +32,7 @@ interface Machine {
   security_deposit_type: string | null;
   security_deposit_amount: number | null;
   security_deposit_notes: string | null;
+
   is_active: boolean;
 }
 
@@ -84,8 +83,8 @@ const AllMachines = () => {
 
   const openEdit = (machine: Machine) => {
     setEditing(machine);
-    setFranchiseShare(machine.franchise_profit_share_percentage || machine.owner_profit_share_percentage || 0);
-    setCloweeShare(machine.clowee_profit_share_percentage || machine.profit_share_percentage || 0);
+    setFranchiseShare(machine.franchise_profit_share_percentage || 0);
+    setCloweeShare(machine.clowee_profit_share_percentage || 0);
   };
   const closeEdit = () => setEditing(null);
 
@@ -105,6 +104,7 @@ const AllMachines = () => {
         vat_percentage: parseFloat(formData.get('vat_percentage') as string),
         franchise_profit_share_percentage: parseFloat(formData.get('franchise_profit_share_percentage') as string),
         clowee_profit_share_percentage: parseFloat(formData.get('clowee_profit_share_percentage') as string),
+
         maintenance_percentage: parseFloat(formData.get('maintenance_percentage') as string),
         duration: formData.get('duration') as string,
         installation_date: formData.get('installation_date') as string,
@@ -339,6 +339,7 @@ const AllMachines = () => {
                   <Label htmlFor="installation_date">Installation Date</Label>
                   <Input id="installation_date" name="installation_date" type="date" defaultValue={editing.installation_date} required />
                 </div>
+
                 <div className="space-y-2">
                   <Label htmlFor="security_deposit_type">Security Deposit Type</Label>
                   <select id="security_deposit_type" name="security_deposit_type" defaultValue={editing.security_deposit_type || ''} className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background">
@@ -409,11 +410,11 @@ const AllMachines = () => {
                 </div>
                 <div className="space-y-2">
                   <Label>Franchise Profit Share</Label>
-                  <div className="p-2 bg-muted rounded">{viewingMachine.franchise_profit_share_percentage || viewingMachine.owner_profit_share_percentage || 0}%</div>
+                  <div className="p-2 bg-muted rounded">{viewingMachine.franchise_profit_share_percentage || 0}%</div>
                 </div>
                 <div className="space-y-2">
                   <Label>Clowee Profit Share</Label>
-                  <div className="p-2 bg-muted rounded">{viewingMachine.clowee_profit_share_percentage || viewingMachine.profit_share_percentage || 0}%</div>
+                  <div className="p-2 bg-muted rounded">{viewingMachine.clowee_profit_share_percentage || 0}%</div>
                 </div>
                 <div className="space-y-2">
                   <Label>Maintenance Percentage</Label>
@@ -435,6 +436,7 @@ const AllMachines = () => {
                   <Label>Security Deposit Amount</Label>
                   <div className="p-2 bg-muted rounded">{viewingMachine.security_deposit_amount ? formatCurrencyBDT(viewingMachine.security_deposit_amount) : 'N/A'}</div>
                 </div>
+
               </div>
               <div className="space-y-2">
                 <Label>Security Deposit Notes</Label>

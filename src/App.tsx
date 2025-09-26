@@ -41,7 +41,7 @@ const App = () => {
                 <Route path="machines" element={<Machines />} />
                 <Route path="all-machines" element={<AllMachines />} />
                 <Route path="all-reports" element={<AllReports />} />
-                <Route path="machine-report" element={<MachineReport />} />
+                <Route path="machine-counter-report" element={<MachineReport />} />
                 <Route path="pay-to-clowee" element={<PayToClowee />} />
                 <Route path="invoices" element={<Invoices />} />
                 <Route path="manage-machines" element={<ManageMachines />} />

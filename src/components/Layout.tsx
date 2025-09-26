@@ -39,7 +39,7 @@ const Layout = () => {
     {
       title: "Machine Counter Report",
       icon: FileText,
-      href: "/machine-report",
+      href: "/machine-counter-report",
     },
     {
       title: "Pay to Clowee",
