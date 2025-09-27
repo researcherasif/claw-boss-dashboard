@@ -24,11 +24,12 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Textarea } from '@/components/ui/textarea';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
-import { Eye, Edit, Trash2 } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
+import { Eye, Edit, Trash2, Plus } from 'lucide-react';
 
 interface Machine {
   id: string;
@@ -45,21 +46,22 @@ interface Machine {
 }
 
 interface Franchise {
-    id: string;
-    name: string;
+  id: string;
+  name: string;
 }
 
 export function AllMachines() {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [franchises, setFranchises] = useState<Franchise[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [isViewDialogOpen, setViewDialogOpen] = useState(false);
   const [isEditDialogOpen, setEditDialogOpen] = useState(false);
+  const [isAddDialogOpen, setAddDialogOpen] = useState(false);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
-  const [newMachine, setNewMachine] = useState<Partial<Machine>>({});
-  const [saving, setSaving] = useState(false);
+  const [selectedFranchiseId, setSelectedFranchiseId] = useState('');
   const [editSaving, setEditSaving] = useState(false);
+  const [addSaving, setAddSaving] = useState(false);
+  const { user } = useAuth();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -67,7 +69,7 @@ export function AllMachines() {
         setLoading(true);
         const [machinesResponse, franchisesResponse] = await Promise.all([
           supabase.from('machines').select('*, franchises(name)'),
-          supabase.from('franchises').select('id, name'),
+          supabase.from('franchises').select('id, name').eq('is_active', true)
         ]);
 
         if (machinesResponse.error) throw machinesResponse.error;
@@ -84,21 +86,68 @@ export function AllMachines() {
     fetchData();
   }, []);
 
-  const handleSave = async (e: React.FormEvent) => {
+
+
+  const handleAddMachine = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaving(true);
+    setAddSaving(true);
     try {
-        const { data, error } = await supabase.from('machines').insert([newMachine]).select('*, franchises(name)').single();
-      if (error) throw error;
+      const formData = new FormData(e.target as HTMLFormElement);
+      const initialCoinCounter = parseInt(formData.get('initial_coin_counter') as string) || 0;
+      const initialPrizeCounter = parseInt(formData.get('initial_prize_counter') as string) || 0;
+      const installationDate = formData.get('installation_date') as string;
       
-      setMachines([...machines, data as Machine]);
-      toast.success('Machine Added');
+      // Insert machine first
+      const { data: machineData, error: machineError } = await supabase
+        .from('machines')
+        .insert({
+          franchise_id: formData.get('franchise_id') as string,
+          name: formData.get('name') as string,
+          machine_number: formData.get('machine_number') as string,
+          esp_id: formData.get('esp_id') as string,
+          branch_location: formData.get('branch_location') as string,
+          installation_date: installationDate,
+          initial_coin_counter: initialCoinCounter,
+          initial_prize_counter: initialPrizeCounter,
+          notes: formData.get('notes') as string,
+        })
+        .select()
+        .single();
+      
+      if (machineError) throw machineError;
+      
+      // Create initial counter report entry
+      console.log('Creating initial report for machine:', machineData.id, 'with counters:', { initialCoinCounter, initialPrizeCounter });
+      
+      const { error: reportError } = await supabase
+        .from('machine_counter_reports')
+        .insert({
+          machine_id: machineData.id,
+          report_date: installationDate,
+          coin_count: initialCoinCounter,
+          prize_count: initialPrizeCounter,
+          notes: 'Initial setup counters',
+          created_by: user?.id || 'system'
+        });
+      
+      if (reportError) {
+        console.error('Failed to create initial report:', reportError);
+        toast.error(`Machine added but initial report failed: ${reportError.message}`);
+      } else {
+        console.log('Initial report created successfully');
+      }
+      
+      toast.success('Machine added successfully!');
       setAddDialogOpen(false);
-      setNewMachine({});
+      setSelectedFranchiseId('');
+      
+      // Refresh machines list
+      const { data } = await supabase.from('machines').select('*, franchises(name)');
+      setMachines(data as Machine[]);
     } catch (error: any) {
-      toast.error(`Error saving machine: ${error.message}`);
+      toast.error(`Add failed: ${error.message}`);
     } finally {
-      setSaving(false);
+      setAddSaving(false);
     }
   };
 
@@ -108,20 +157,88 @@ export function AllMachines() {
     setEditSaving(true);
     try {
       const formData = new FormData(e.target as HTMLFormElement);
-      const { error } = await supabase
+      const newInitialCoin = parseInt(formData.get('initial_coin_counter') as string) || 0;
+      const newInitialPrize = parseInt(formData.get('initial_prize_counter') as string) || 0;
+      const installationDate = formData.get('installation_date') as string;
+      
+      // Update machine
+      const { error: machineError } = await supabase
         .from('machines')
         .update({
-          franchise_id: formData.get('franchise_id') as string,
           name: formData.get('name') as string,
           machine_number: formData.get('machine_number') as string,
           esp_id: formData.get('esp_id') as string,
           branch_location: formData.get('branch_location') as string,
-          installation_date: formData.get('installation_date') as string,
+          installation_date: installationDate,
+          initial_coin_counter: newInitialCoin,
+          initial_prize_counter: newInitialPrize,
           notes: formData.get('notes') as string,
         })
         .eq('id', selectedMachine.id);
       
-      if (error) throw error;
+      if (machineError) throw machineError;
+      
+      // Only create/update report if we have initial counters
+      if (newInitialCoin > 0 || newInitialPrize > 0) {
+        console.log('Creating/updating initial report with counters:', { newInitialCoin, newInitialPrize });
+        
+        // Check for existing initial report
+        const { data: existingInitialReport, error: fetchError } = await supabase
+          .from('machine_counter_reports')
+          .select('id')
+          .eq('machine_id', selectedMachine.id)
+          .order('report_date', { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        
+        if (fetchError) {
+          console.error('Error fetching existing report:', fetchError);
+        }
+        
+        if (existingInitialReport) {
+          console.log('Updating existing initial report:', existingInitialReport.id);
+          // Update existing initial report
+          const { error: reportError } = await supabase
+            .from('machine_counter_reports')
+            .update({
+              report_date: installationDate,
+              coin_count: newInitialCoin,
+              prize_count: newInitialPrize,
+              notes: 'Initial setup counters (updated)',
+            })
+            .eq('id', existingInitialReport.id);
+          
+          if (reportError) {
+            console.error('Failed to update initial report:', reportError);
+            toast.error(`Failed to update initial report: ${reportError.message}`);
+          } else {
+            console.log('Initial report updated successfully');
+          }
+        } else {
+          console.log('Creating new initial report');
+          // Create new initial report if none exists
+          const { error: reportError } = await supabase
+            .from('machine_counter_reports')
+            .insert({
+              machine_id: selectedMachine.id,
+              report_date: installationDate,
+              coin_count: newInitialCoin,
+              prize_count: newInitialPrize,
+              notes: 'Initial setup counters',
+              created_by: user?.id || 'system'
+            });
+          
+          if (reportError) {
+            console.error('Failed to create initial report:', reportError);
+            toast.error(`Failed to create initial report: ${reportError.message}`);
+          } else {
+            console.log('Initial report created successfully');
+          }
+        }
+      } else {
+        console.log('No initial counters provided, skipping report creation');
+      }
+      
       toast.success('Machine updated successfully!');
       setEditDialogOpen(false);
       
@@ -143,7 +260,10 @@ export function AllMachines() {
             <CardTitle>All Machines</CardTitle>
             <CardDescription>Manage your claw machines.</CardDescription>
           </div>
-          <Button onClick={() => setAddDialogOpen(true)}>Add Machine</Button>
+          <Button onClick={() => setAddDialogOpen(true)} className="flex items-center gap-2">
+            <Plus className="h-4 w-4" />
+            Add Machine
+          </Button>
         </CardHeader>
         <CardContent>
           <div className="relative w-full overflow-auto" style={{ maxHeight: '600px' }}>
@@ -208,68 +328,7 @@ export function AllMachines() {
         </CardContent>
       </Card>
 
-      <Dialog open={isAddDialogOpen} onOpenChange={(open) => {
-        setAddDialogOpen(open);
-        if (!open) setNewMachine({});
-      }}>
-        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Add New Machine</DialogTitle>
-          </DialogHeader>
-          <form onSubmit={handleSave} className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-2 col-span-1 md:col-span-2">
-                <Label htmlFor="franchiseId">Franchise*</Label>
-                <Select required value={newMachine.franchise_id || ''} onValueChange={(value) => setNewMachine({...newMachine, franchise_id: value})}>
-                  <SelectTrigger><SelectValue placeholder="Select a franchise" /></SelectTrigger>
-                  <SelectContent>
-                    {franchises.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="name">Machine Name*</Label>
-                <Input id="name" required onChange={(e) => setNewMachine({...newMachine, name: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="machineNumber">Machine Number*</Label>
-                <Input id="machineNumber" required onChange={(e) => setNewMachine({...newMachine, machine_number: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="espId">Machine ID (ESP ID)*</Label>
-                <Input id="espId" required onChange={(e) => setNewMachine({...newMachine, esp_id: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="branchLocation">Branch Location*</Label>
-                <Input id="branchLocation" required onChange={(e) => setNewMachine({...newMachine, branch_location: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="installationDate">Installation Date*</Label>
-                <Input id="installationDate" type="date" required onChange={(e) => setNewMachine({...newMachine, installation_date: e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="initialCoinCounter">Initial Coin Counter*</Label>
-                <Input id="initialCoinCounter" type="number" required onChange={(e) => setNewMachine({...newMachine, initial_coin_counter: +e.target.value})} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="initialPrizeCounter">Initial Prize Counter*</Label>
-                <Input id="initialPrizeCounter" type="number" required onChange={(e) => setNewMachine({...newMachine, initial_prize_counter: +e.target.value})} />
-              </div>
-              <div className="space-y-2 col-span-1 md:col-span-2">
-                <Label htmlFor="notes">Notes</Label>
-                <Textarea id="notes" onChange={(e) => setNewMachine({...newMachine, notes: e.target.value})} />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="ghost" onClick={() => {
-                setAddDialogOpen(false);
-                setNewMachine({});
-              }}>Cancel</Button>
-              <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Machine'}</Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>.
-      </Dialog>
+
 
       {/* View Dialog */}
       <Dialog open={isViewDialogOpen} onOpenChange={setViewDialogOpen}>
@@ -298,6 +357,73 @@ export function AllMachines() {
         </DialogContent>
       </Dialog>
 
+      {/* Add Dialog */}
+      <Dialog open={isAddDialogOpen} onOpenChange={setAddDialogOpen}>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Add New Machine</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleAddMachine} className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="franchise_id">Franchise*</Label>
+                <Select name="franchise_id" value={selectedFranchiseId} onValueChange={setSelectedFranchiseId} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select franchise" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {franchises.map((franchise) => (
+                      <SelectItem key={franchise.id} value={franchise.id}>
+                        {franchise.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="name">Machine Name*</Label>
+                <Input id="name" name="name" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="machine_number">Machine Number*</Label>
+                <Input id="machine_number" name="machine_number" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="esp_id">Machine ID (ESP ID)*</Label>
+                <Input id="esp_id" name="esp_id" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="branch_location">Branch Location*</Label>
+                <Input id="branch_location" name="branch_location" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="installation_date">Installation Date*</Label>
+                <Input id="installation_date" name="installation_date" type="date" required />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="initial_coin_counter">Initial Coin Counter</Label>
+                <Input id="initial_coin_counter" name="initial_coin_counter" type="number" min="0" defaultValue="0" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="initial_prize_counter">Initial Prize Counter</Label>
+                <Input id="initial_prize_counter" name="initial_prize_counter" type="number" min="0" defaultValue="0" />
+              </div>
+              <div className="space-y-2 col-span-1 md:col-span-2">
+                <Label htmlFor="notes">Notes</Label>
+                <Textarea id="notes" name="notes" />
+              </div>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="ghost" onClick={() => {
+                setAddDialogOpen(false);
+                setSelectedFranchiseId('');
+              }}>Cancel</Button>
+              <Button type="submit" disabled={addSaving}>{addSaving ? 'Adding...' : 'Add Machine'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Edit Dialog */}
       <Dialog open={isEditDialogOpen} onOpenChange={setEditDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -307,15 +433,6 @@ export function AllMachines() {
           {selectedMachine && (
             <form onSubmit={handleEditMachine} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-2 col-span-1 md:col-span-2">
-                  <Label htmlFor="franchise_id">Franchise*</Label>
-                  <Select name="franchise_id" defaultValue={selectedMachine.franchise_id} required>
-                    <SelectTrigger><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      {franchises.map(f => <SelectItem key={f.id} value={f.id}>{f.name}</SelectItem>)}
-                    </SelectContent>
-                  </Select>
-                </div>
                 <div className="space-y-2">
                   <Label htmlFor="name">Machine Name*</Label>
                   <Input id="name" name="name" defaultValue={selectedMachine.name} required />
@@ -335,6 +452,14 @@ export function AllMachines() {
                 <div className="space-y-2">
                   <Label htmlFor="installation_date">Installation Date*</Label>
                   <Input id="installation_date" name="installation_date" type="date" defaultValue={selectedMachine.installation_date} required />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="initial_coin_counter">Initial Coin Counter</Label>
+                  <Input id="initial_coin_counter" name="initial_coin_counter" type="number" min="0" defaultValue={selectedMachine.initial_coin_counter} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="initial_prize_counter">Initial Prize Counter</Label>
+                  <Input id="initial_prize_counter" name="initial_prize_counter" type="number" min="0" defaultValue={selectedMachine.initial_prize_counter} />
                 </div>
                 <div className="space-y-2 col-span-1 md:col-span-2">
                   <Label htmlFor="notes">Notes</Label>

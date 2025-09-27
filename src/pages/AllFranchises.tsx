@@ -38,6 +38,8 @@ const AllFranchises = () => {
   const [loading, setLoading] = useState(true);
   const [editingFranchise, setEditingFranchise] = useState<Franchise | null>(null);
   const [saving, setSaving] = useState(false);
+  const [editPaymentDuration, setEditPaymentDuration] = useState('');
+  const [editSecurityDepositType, setEditSecurityDepositType] = useState('');
 
   useEffect(() => {
     fetchFranchises();
@@ -62,7 +64,7 @@ const AllFranchises = () => {
   const downloadFile = async (filePath: string, fileName: string) => {
     try {
       const { data, error } = await supabase.storage
-        .from('franchise-documents')
+        .from('documents')
         .download(filePath);
       
       if (error) throw error;
@@ -77,18 +79,20 @@ const AllFranchises = () => {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Error downloading file:', error);
+      toast.error('Failed to download file');
     }
   };
 
   const viewFile = async (filePath: string) => {
     try {
       const { data } = await supabase.storage
-        .from('franchise-documents')
+        .from('documents')
         .getPublicUrl(filePath);
       
       window.open(data.publicUrl, '_blank');
     } catch (error) {
       console.error('Error viewing file:', error);
+      toast.error('Failed to view file');
     }
   };
 
@@ -117,6 +121,67 @@ const AllFranchises = () => {
     setSaving(true);
     try {
       const formData = new FormData(e.target as HTMLFormElement);
+      
+      // Handle file uploads with fallback
+      const agreementFile = formData.get('agreement_copy') as File;
+      const tradeNidFiles = formData.getAll('trade_nid_attachments') as File[];
+      
+      let agreementUrl = editingFranchise.agreement_copy_url;
+      let tradeNidUrls = editingFranchise.trade_nid_attachments || [];
+      let uploadWarnings: string[] = [];
+      
+      // Upload agreement copy if provided
+      if (agreementFile && agreementFile.size > 0) {
+        try {
+          const agreementPath = `${editingFranchise.id}/agreement_${Date.now()}.${agreementFile.name.split('.').pop()}`;
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(agreementPath, agreementFile);
+          
+          if (uploadError) {
+            console.error('Agreement upload error:', uploadError);
+            uploadWarnings.push('Agreement file upload failed - storage not configured');
+          } else {
+            agreementUrl = agreementPath;
+          }
+        } catch (error) {
+          console.error('Agreement upload failed:', error);
+          uploadWarnings.push('Agreement file upload failed');
+        }
+      }
+      
+      // Upload trade/NID files if provided
+      if (tradeNidFiles.length > 0 && tradeNidFiles[0].size > 0) {
+        try {
+          const uploadPromises = tradeNidFiles.map(async (file, index) => {
+            if (file.size > 0) {
+              const filePath = `${editingFranchise.id}/trade_nid_${Date.now()}_${index}.${file.name.split('.').pop()}`;
+              const { error: uploadError } = await supabase.storage
+                .from('documents')
+                .upload(filePath, file);
+              
+              if (uploadError) {
+                console.error('Trade/NID upload error:', uploadError);
+                return null;
+              }
+              return filePath;
+            }
+            return null;
+          });
+          
+          const uploadedPaths = await Promise.all(uploadPromises);
+          const validPaths = uploadedPaths.filter(path => path !== null);
+          if (validPaths.length > 0) {
+            tradeNidUrls = [...tradeNidUrls, ...validPaths];
+          } else if (tradeNidFiles.some(f => f.size > 0)) {
+            uploadWarnings.push('Trade/NID files upload failed - storage not configured');
+          }
+        } catch (error) {
+          console.error('Trade/NID upload failed:', error);
+          uploadWarnings.push('Trade/NID files upload failed');
+        }
+      }
+      
       const { error } = await supabase
         .from('franchises')
         .update({
@@ -133,12 +198,22 @@ const AllFranchises = () => {
           payment_duration: formData.get('payment_duration') as string,
           security_deposit_type: formData.get('security_deposit_type') as string,
           security_deposit_notes: formData.get('security_deposit_notes') as string,
+          agreement_copy_url: agreementUrl,
+          trade_nid_attachments: tradeNidUrls,
         })
         .eq('id', editingFranchise.id);
       
       if (error) throw error;
-      toast.success('Franchise updated successfully!');
+      
+      if (uploadWarnings.length > 0) {
+        toast.success(`Franchise updated successfully! Note: ${uploadWarnings.join(', ')}`);
+      } else {
+        toast.success('Franchise updated successfully!');
+      }
+      
       setEditingFranchise(null);
+      setEditPaymentDuration('');
+      setEditSecurityDepositType('');
       fetchFranchises();
     } catch (error: any) {
       toast.error(`Update failed: ${error.message}`);
@@ -176,17 +251,21 @@ const AllFranchises = () => {
           </CardContent>
         </Card>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           {franchises.map((franchise) => (
             <Card key={franchise.id} className="hover:shadow-lg transition-shadow">
               <CardHeader>
                 <div className="flex justify-between items-start">
                   <CardTitle className="text-lg">{franchise.name}</CardTitle>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-0">
                     <Button
                       size="sm"
                       variant="ghost"
-                      onClick={() => setEditingFranchise(franchise)}
+                      onClick={() => {
+                        setEditingFranchise(franchise);
+                        setEditPaymentDuration(franchise.payment_duration);
+                        setEditSecurityDepositType(franchise.security_deposit_type || '');
+                      }}
                       className="h-8 w-8 p-0"
                     >
                       <Edit className="h-4 w-4" />
@@ -310,12 +389,12 @@ const AllFranchises = () => {
 
       {/* Edit Dialog */}
       <Dialog open={!!editingFranchise} onOpenChange={(open) => !open && setEditingFranchise(null)}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Edit Franchise</DialogTitle>
           </DialogHeader>
           {editingFranchise && (
-            <form onSubmit={handleEditFranchise} className="space-y-4">
+            <form onSubmit={handleEditFranchise} className="space-y-4 pb-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="name">Franchise Name</Label>
@@ -359,9 +438,9 @@ const AllFranchises = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="payment_duration">Payment Duration</Label>
-                  <Select name="payment_duration" defaultValue={editingFranchise.payment_duration}>
+                  <Select name="payment_duration" value={editPaymentDuration} onValueChange={setEditPaymentDuration}>
                     <SelectTrigger>
-                      <SelectValue />
+                      <SelectValue placeholder="Select duration" />
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="half_month">Half Month</SelectItem>
@@ -371,7 +450,7 @@ const AllFranchises = () => {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="security_deposit_type">Security Deposit Type</Label>
-                  <Select name="security_deposit_type" defaultValue={editingFranchise.security_deposit_type || ''}>
+                  <Select name="security_deposit_type" value={editSecurityDepositType} onValueChange={setEditSecurityDepositType}>
                     <SelectTrigger>
                       <SelectValue placeholder="Select type" />
                     </SelectTrigger>
@@ -386,10 +465,35 @@ const AllFranchises = () => {
                   <Label htmlFor="security_deposit_notes">Security Deposit Notes</Label>
                   <Input id="security_deposit_notes" name="security_deposit_notes" defaultValue={editingFranchise.security_deposit_notes || ''} />
                 </div>
+                
+                {/* File Upload Section */}
+                <div className="space-y-4 col-span-1 md:col-span-2 border-t pt-4">
+                  <h3 className="font-medium text-sm">Upload Attachments</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="agreement_copy">Agreement Copy (PDF)</Label>
+                    <Input id="agreement_copy" name="agreement_copy" type="file" accept=".pdf,.jpg,.jpeg,.png" />
+                    {editingFranchise.agreement_copy_url && (
+                      <p className="text-xs text-muted-foreground">Current: Agreement copy uploaded</p>
+                    )}
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="trade_nid_attachments">Trade License / NID Documents</Label>
+                    <Input id="trade_nid_attachments" name="trade_nid_attachments" type="file" accept=".pdf,.jpg,.jpeg,.png" multiple />
+                    {editingFranchise.trade_nid_attachments && editingFranchise.trade_nid_attachments.length > 0 && (
+                      <p className="text-xs text-muted-foreground">Current: {editingFranchise.trade_nid_attachments.length} document(s) uploaded</p>
+                    )}
+                  </div>
+                </div>
               </div>
               <DialogFooter>
-                <Button type="button" variant="ghost" onClick={() => setEditingFranchise(null)}>Cancel</Button>
-                <Button type="submit" disabled={saving}>{saving ? 'Saving...' : 'Save Changes'}</Button>
+                <Button type="button" variant="ghost" onClick={() => {
+                  setEditingFranchise(null);
+                  setEditPaymentDuration('');
+                  setEditSecurityDepositType('');
+                }}>Cancel</Button>
+                <Button type="submit" disabled={saving}>{saving ? 'Uploading & Saving...' : 'Save Changes'}</Button>
               </DialogFooter>
             </form>
           )}

@@ -1,55 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from "sonner";
+import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
-
-interface Franchise {
-  id: string;
-  franchise_name: string;
-}
 
 const AddMachine = () => {
   const [loading, setLoading] = useState(false);
-  const [franchises, setFranchises] = useState<Franchise[]>([]);
-  const [selectedFranchise, setSelectedFranchise] = useState('');
+  const [depositType, setDepositType] = useState('');
+  const { toast } = useToast();
   const navigate = useNavigate();
-
-  useEffect(() => {
-    fetchFranchises();
-  }, []);
-
-  const fetchFranchises = async () => {
-    try {
-      console.log('Fetching franchises...');
-      const { data, error } = await supabase
-        .from('franchises')
-        .select('id, franchise_name')
-        .eq('is_active', true);
-      
-      console.log('Franchise query result:', { data, error });
-      
-      if (error) throw error;
-      
-      setFranchises(data || []);
-      console.log('Franchises set:', data);
-      
-      if (!data || data.length === 0) {
-        toast.error('No active franchises found. Please add a franchise first.');
-      } else {
-        toast.success(`Found ${data.length} franchise(s)`);
-      }
-    } catch (error: any) {
-      console.error('Error fetching franchises:', error);
-      toast.error('Error fetching franchises: ' + error.message);
-    }
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -58,53 +22,81 @@ const AddMachine = () => {
     try {
       const formData = new FormData(e.target as HTMLFormElement);
       
-      const machineData = {
-        franchise_id: formData.get('franchise_id') as string,
+      const ownerShare = parseFloat(formData.get('owner_profit_share_percentage') as string);
+      const cloweeShare = parseFloat(formData.get('clowee_profit_share_percentage') as string);
+
+      if (!Number.isFinite(ownerShare) || !Number.isFinite(cloweeShare)) {
+        throw new Error('Please provide valid profit share percentages');
+      }
+
+      if (ownerShare + cloweeShare > 100.0) {
+        throw new Error('Owner + Clowee profit share cannot exceed 100%');
+      }
+
+      // Detect if new share columns exist
+      let supportsSplitShares = true;
+      try {
+        const test = await supabase
+          .from('machines')
+          .select('owner_profit_share_percentage, clowee_profit_share_percentage')
+          .limit(1);
+        if (test.error) supportsSplitShares = false;
+      } catch {
+        supportsSplitShares = false;
+      }
+
+      const baseData = {
         name: formData.get('name') as string,
-        machine_number: formData.get('machine_number') as string,
-        esp_id: formData.get('machine_id_esp') as string,
-        branch_location: formData.get('branch_location') as string,
+        coin_price: parseFloat(formData.get('coin_price') as string),
+        doll_price: parseFloat(formData.get('doll_price') as string),
+        electricity_cost: parseFloat(formData.get('electricity_cost') as string),
+        vat_percentage: parseFloat(formData.get('vat_percentage') as string),
+        maintenance_percentage: parseFloat(formData.get('maintenance_percentage') as string),
+        duration: formData.get('duration') as string,
+        location: formData.get('location') as string,
         installation_date: formData.get('installation_date') as string,
-        notes: formData.get('notes') as string || null,
-      };
+        security_deposit_type: formData.get('security_deposit_type') as string,
+        security_deposit_amount: depositType === 'cash' ? parseFloat(formData.get('security_deposit_amount') as string) : null,
+        security_deposit_notes: formData.get('security_deposit_notes') as string || null,
+      } as any;
 
-      const { data: machine, error: machineError } = await supabase
-        .from('machines')
-        .insert([machineData])
-        .select()
-        .single();
+      const machineData = supportsSplitShares
+        ? {
+            ...baseData,
+            franchise_profit_share_percentage: parseFloat(formData.get('franchise_profit_share_percentage') as string),
+            clowee_profit_share_percentage: parseFloat(formData.get('clowee_profit_share_percentage') as string),
+          }
+        : {
+            ...baseData,
+            profit_share_percentage: parseFloat(formData.get('clowee_profit_share_percentage') as string),
+          };
 
-      if (machineError) throw machineError;
+      const { error } = await supabase.from('machines').insert([machineData]);
 
-      // Create initial counter report
-      const counterData = {
-        machine_id: machine.id,
-        report_date: formData.get('installation_date') as string,
-        coin_count: parseInt(formData.get('initial_coin_counter') as string),
-        prize_count: parseInt(formData.get('initial_prize_counter') as string),
-        notes: 'Initial setup counters',
-      };
+      if (error) throw error;
 
-      const { error: counterError } = await supabase
-        .from('machine_counter_reports')
-        .insert([counterData]);
+      toast({
+        title: "Machine added successfully",
+        description: "The new machine has been registered in the system.",
+      });
 
-      if (counterError) throw counterError;
-
-      toast.success('Machine added successfully');
       navigate('/');
     } catch (error: any) {
-      toast.error('Error adding machine: ' + error.message);
+      toast({
+        title: "Error adding machine",
+        description: error.message,
+        variant: "destructive",
+      });
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="p-3 sm:p-6 max-w-4xl mx-auto">
-      <div className="mb-6 sm:mb-8">
-        <h1 className="text-2xl sm:text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Add New Machine</h1>
-        <p className="text-muted-foreground mt-2 text-base sm:text-lg">
+    <div className="p-6 max-w-2xl mx-auto">
+      <div className="mb-8">
+        <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/70 bg-clip-text text-transparent">Add New Machine</h1>
+        <p className="text-muted-foreground mt-2 text-lg">
           Register a new claw machine in the system
         </p>
       </div>
@@ -113,44 +105,14 @@ const AddMachine = () => {
         <CardHeader className="pb-6">
           <CardTitle className="text-2xl font-semibold">Machine Details</CardTitle>
           <CardDescription className="text-base">
-            Enter all the required information for the new machine
+            Enter all the required information for the new claw machine
           </CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="franchise_id">Franchise *</Label>
-                <Select name="franchise_id" value={selectedFranchise} onValueChange={setSelectedFranchise} required>
-                  <SelectTrigger>
-                    <SelectValue placeholder={franchises.length === 0 ? "No franchises available" : "Select franchise"} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {franchises.length === 0 ? (
-                      <SelectItem value="" disabled>
-                        No franchises found
-                      </SelectItem>
-                    ) : (
-                      franchises.map((franchise) => (
-                        <SelectItem key={franchise.id} value={franchise.id}>
-                          {franchise.franchise_name}
-                        </SelectItem>
-                      ))
-                    )}
-                  </SelectContent>
-                </Select>
-                {franchises.length === 0 && (
-                  <p className="text-sm text-red-500">
-                    No active franchises found. Please add a franchise first.
-                  </p>
-                )}
-                <p className="text-xs text-gray-500">
-                  Debug: Found {franchises.length} franchises
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="name">Machine Name *</Label>
+                <Label htmlFor="name">Machine Name</Label>
                 <Input
                   id="name"
                   name="name"
@@ -161,32 +123,10 @@ const AddMachine = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="machine_number">Machine Number *</Label>
+                <Label htmlFor="location">Location (Branch)</Label>
                 <Input
-                  id="machine_number"
-                  name="machine_number"
-                  type="text"
-                  placeholder="e.g., CM001"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="machine_id_esp">Machine ID (ESP ID) *</Label>
-                <Input
-                  id="machine_id_esp"
-                  name="machine_id_esp"
-                  type="text"
-                  placeholder="e.g., ESP001"
-                  required
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="branch_location">Branch Location *</Label>
-                <Input
-                  id="branch_location"
-                  name="branch_location"
+                  id="location"
+                  name="location"
                   type="text"
                   placeholder="e.g., Mall Branch A"
                   required
@@ -194,7 +134,115 @@ const AddMachine = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="installation_date">Installation Date *</Label>
+                <Label htmlFor="coin_price">Coin Price (BDT)</Label>
+                <Input
+                  id="coin_price"
+                  name="coin_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="0.50"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="doll_price">Doll Price (BDT)</Label>
+                <Input
+                  id="doll_price"
+                  name="doll_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="2.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="electricity_cost">Electricity Cost (BDT)</Label>
+                <Input
+                  id="electricity_cost"
+                  name="electricity_cost"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="50.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="vat_percentage">VAT Percentage (%)</Label>
+                <Input
+                  id="vat_percentage"
+                  name="vat_percentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="15.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="franchise_profit_share_percentage">Franchise Profit Share (%)</Label>
+                <Input
+                  id="franchise_profit_share_percentage"
+                  name="franchise_profit_share_percentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="0.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="clowee_profit_share_percentage">Clowee Profit Share (%)</Label>
+                <Input
+                  id="clowee_profit_share_percentage"
+                  name="clowee_profit_share_percentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="30.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="maintenance_percentage">Maintenance Percentage (%)</Label>
+                <Input
+                  id="maintenance_percentage"
+                  name="maintenance_percentage"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  max="100"
+                  placeholder="5.00"
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="duration">Payment Duration</Label>
+                <Select name="duration" required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select duration" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="half_month">Half Month</SelectItem>
+                    <SelectItem value="full_month">Full Month</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="installation_date">Installation Date</Label>
                 <Input
                   id="installation_date"
                   name="installation_date"
@@ -204,46 +252,78 @@ const AddMachine = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="initial_coin_counter">Initial Coin Counter *</Label>
-                <Input
-                  id="initial_coin_counter"
-                  name="initial_coin_counter"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  required
-                />
+                <Label htmlFor="security_deposit_type">Security Deposit Type</Label>
+                <Select name="security_deposit_type" value={depositType} onValueChange={setDepositType} required>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select deposit type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="cheque">Cheque</SelectItem>
+                    <SelectItem value="cash">Cash</SelectItem>
+                    <SelectItem value="other">Other</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="initial_prize_counter">Initial Prize Counter *</Label>
-                <Input
-                  id="initial_prize_counter"
-                  name="initial_prize_counter"
-                  type="number"
-                  min="0"
-                  placeholder="0"
-                  required
-                />
-              </div>
+              {depositType && (
+                <>
+                  {depositType === 'cash' && (
+                    <div className="space-y-2">
+                      <Label htmlFor="security_deposit_amount">Cash Amount (BDT)</Label>
+                      <Input
+                        id="security_deposit_amount"
+                        name="security_deposit_amount"
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        placeholder="10000.00"
+                        required
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-2">
+                    <Label htmlFor="security_deposit_notes">
+                      {depositType === 'cheque' ? 'Cheque Details' : 
+                       depositType === 'cash' ? 'Cash Notes (Optional)' : 
+                       'Security Deposits Other Details'}
+                    </Label>
+                    <Input
+                      id="security_deposit_notes"
+                      name="security_deposit_notes"
+                      type="text"
+                      placeholder={
+                        depositType === 'cheque' ? 'Cheque number, bank name, etc.' :
+                        depositType === 'cash' ? 'Additional notes about cash deposit' :
+                        'Describe the deposit type'
+                      }
+                      required={depositType !== 'cash'}
+                    />
+                  </div>
+                </>
+              )}
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="notes">Notes</Label>
-              <Textarea
-                id="notes"
-                name="notes"
-                placeholder="Optional notes about the machine..."
-                rows={3}
+              <Label htmlFor="security_deposit_notes">Security Deposit Notes</Label>
+              <Input
+                id="security_deposit_notes"
+                name="security_deposit_notes"
+                type="text"
+                placeholder="Additional notes about the security deposit"
               />
             </div>
 
-            <div className="flex gap-4 pt-4">
-              <Button type="submit" disabled={loading} className="flex-1">
+            <div className="flex gap-4 pt-6">
+              <Button type="submit" disabled={loading} className="flex-1 bg-gradient-to-r from-primary to-primary/80 hover:from-primary/90 hover:to-primary/70 font-semibold py-3 rounded-lg transition-all duration-300 hover:scale-105">
                 {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Add Machine
               </Button>
-              <Button type="button" variant="outline" onClick={() => navigate('/')} className="flex-1">
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={() => navigate('/')}
+                className="flex-1 py-3 rounded-lg transition-all duration-300"
+              >
                 Cancel
               </Button>
             </div>

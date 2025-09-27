@@ -82,6 +82,7 @@ interface PayToCloweeRecord {
 const PayToClowee = () => {
   const [machines, setMachines] = useState<Machine[]>([]);
   const [selectedMachine, setSelectedMachine] = useState<Machine | null>(null);
+  const [selectedMachineId, setSelectedMachineId] = useState('');
   const [calculationResult, setCalculationResult] = useState<CalculationResult | null>(null);
   const [payToCloweeRecords, setPayToCloweeRecords] = useState<PayToCloweeRecord[]>([]);
   const [editingRecord, setEditingRecord] = useState<PayToCloweeRecord | null>(null);
@@ -327,6 +328,8 @@ const PayToClowee = () => {
 
       await fetchPayToCloweeRecords();
       setCalculationResult(null);
+      setSelectedMachineId('');
+      setSelectedMachine(null);
 
     } catch (error: any) {
       toast({
@@ -481,8 +484,9 @@ const PayToClowee = () => {
               <div className="space-y-2">
                 <Label htmlFor="machine">Select Machine</Label>
                 <Select 
-                  value={selectedMachine?.id || ''} 
+                  value={selectedMachineId} 
                   onValueChange={(value) => {
+                    setSelectedMachineId(value);
                     const machine = machines.find(m => m.id === value);
                     setSelectedMachine(machine || null);
                   }}

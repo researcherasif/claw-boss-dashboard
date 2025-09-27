@@ -20,6 +20,10 @@ interface Machine {
   name: string;
   branch_location: string;
   franchise_id: string;
+  franchises?: {
+    coin_price: number;
+    doll_price: number;
+  };
 }
 
 interface MachineReport {
@@ -31,7 +35,7 @@ interface MachineReport {
   created_at: string;
   machines: {
     name: string;
-    location: string;
+    branch_location: string;
   };
 }
 
@@ -99,14 +103,22 @@ const MachineReport = () => {
         .order('report_date', { ascending: false })
         .limit(50);
 
-      if (reportsError) throw reportsError;
+      if (reportsError) {
+        console.error('Reports fetch error:', reportsError);
+        throw reportsError;
+      }
+
+      console.log('Fetched reports:', reportsData?.length || 0);
 
       // Then get machines data and merge
       const { data: machinesData, error: machinesError } = await supabase
         .from('machines')
         .select('id, name, branch_location');
 
-      if (machinesError) throw machinesError;
+      if (machinesError) {
+        console.error('Machines fetch error:', machinesError);
+        throw machinesError;
+      }
 
       // Merge the data
       const reportsWithMachines = reportsData?.map(report => {
@@ -117,8 +129,10 @@ const MachineReport = () => {
         };
       }) || [];
 
+      console.log('Reports with machines:', reportsWithMachines.length);
       setReports(reportsWithMachines);
     } catch (error: any) {
+      console.error('Fetch reports error:', error);
       toast({
         title: "Error loading reports",
         description: error.message,
@@ -214,7 +228,7 @@ const MachineReport = () => {
         });
       }
 
-      fetchReports();
+      await fetchReports(); // Wait for refresh
       (e.target as HTMLFormElement).reset();
       setSelectedMachine('');
       setSelectedDate(today);
@@ -266,7 +280,7 @@ const MachineReport = () => {
       if (error) throw error;
       toast({ title: 'Report updated successfully' });
       setEditingReport(null);
-      fetchReports();
+      await fetchReports();
     } catch (error: any) {
       toast({ title: 'Update failed', description: error.message, variant: 'destructive' });
     } finally {
@@ -282,7 +296,7 @@ const MachineReport = () => {
       if (error) throw error;
       toast({ title: 'Report deleted successfully' });
       setDeletingReport(null);
-      fetchReports();
+      await fetchReports();
     } catch (error: any) {
       toast({ title: 'Delete failed', description: error.message, variant: 'destructive' });
     } finally {

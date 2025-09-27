@@ -81,21 +81,30 @@ const ManageMachines = () => {
 
   const fetchRecentChanges = async () => {
     try {
-      const { data, error } = await supabase
+      // First get settings history
+      const { data: historyData, error: historyError } = await supabase
         .from('machine_settings_history')
-        .select(`
-          *,
-          machines!inner(name)
-        `)
+        .select('*')
         .order('created_at', { ascending: false })
         .limit(20);
 
-      if (error) throw error;
-      
-      const formattedData = (data || []).map(item => ({
-        ...item,
-        machine_name: item.machines.name
-      }));
+      if (historyError) throw historyError;
+
+      // Then get machines data
+      const { data: machinesData, error: machinesError } = await supabase
+        .from('machines')
+        .select('id, name');
+
+      if (machinesError) throw machinesError;
+
+      // Merge the data
+      const formattedData = (historyData || []).map(item => {
+        const machine = machinesData?.find(m => m.id === item.machine_id);
+        return {
+          ...item,
+          machine_name: machine?.name || 'Unknown Machine'
+        };
+      });
       
       setRecentChanges(formattedData);
     } catch (error: any) {

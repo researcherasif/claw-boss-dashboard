@@ -90,7 +90,7 @@ const Layout = () => {
                 <span className="text-white font-bold text-sm">C</span>
               </div>
               <div>
-                <h1 className="text-white font-bold text-lg">CLOWEE CONTROLS</h1>
+                <h1 className="text-white font-bold text-lg">CLOWEE</h1>
                 <p className="text-gray-400 text-xs">Business Management</p>
               </div>
             </div>
